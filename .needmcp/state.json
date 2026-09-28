@@ -1,0 +1,14 @@
+{
+  "style": {
+    "slug": "alabaster-grid-console",
+    "name": "Alabaster Grid Console",
+    "updated_at": "2026-09-28T00:00:00Z"
+  },
+  "dna": {
+    "slug": "siakad-kampus-design-md",
+    "name": "SIAKAD KAMPUS — design.md (Nocturne Academic)",
+    "updated_at": "2026-09-28T00:00:00Z"
+  },
+  "note": "design.md adalah sumber kebenaran. Token katalog style di atas TIDAK dipakai — palet SIAKAD (Indigo #1E3A8A + Gold, Plus Jakarta Sans) intentional berbeda dari teal/amber + Inter. Yang dipinjam hanya bentuk: hairline density, tabular-nums, spacing 64/96px.",
+  "updated_at": "2026-09-28T00:00:00Z"
+}

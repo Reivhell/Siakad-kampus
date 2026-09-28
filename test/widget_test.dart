@@ -1,30 +1,43 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:siakad_kampus/admin/admin_shell.dart';
+import 'package:siakad_kampus/app/theme/app_colors.dart';
 import 'package:siakad_kampus/main.dart';
 
+Future<void> _setSurface(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(1440, 1600);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(() => tester.view.resetPhysicalSize());
+}
+
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('app memakai SiakadTheme light di kanvas terang', (tester) async {
+    await _setSurface(tester);
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(const SiakadApp());
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pumpAndSettle();
+    final ctx = tester.element(find.byType(AdminShell));
+    final theme = Theme.of(ctx);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(theme.colorScheme.primary, AppColors.indigoBlue);
+    expect(theme.scaffoldBackgroundColor, AppColors.lightBg);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('dark mode memakai lapisan Nocturne Academic', (tester) async {
+    await _setSurface(tester);
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+
+    await tester.pumpWidget(const SiakadApp());
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pumpAndSettle();
+    final theme = Theme.of(tester.element(find.byType(AdminShell)));
+
+    expect(theme.colorScheme.primary, AppColors.darkPrimary);
+    expect(theme.scaffoldBackgroundColor, AppColors.darkBg);
   });
 }

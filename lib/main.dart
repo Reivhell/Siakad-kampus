@@ -1,43 +1,23 @@
 import 'package:flutter/material.dart';
 
+import 'admin/admin_shell.dart';
+import 'app/theme/siakad_theme.dart';
+
 void main() {
-  runApp(const MyApp());
+  runApp(const SiakadApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class SiakadApp extends StatelessWidget {
+  const SiakadApp({super.key});
 
-  @override
+  @override 
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SIAKAD KAMPUS',
-      theme: ThemeData(
-        primaryColor: Colors.blue,
-      ),
-      home: const MyHomePage(title: 'SIAKAD KAMPUS HOMEPAGE'),
+      theme: SiakadTheme.light,
+      darkTheme: SiakadTheme.dark,
+      home: const AdminShell(),
       debugShowCheckedModeBanner: false,
-      darkTheme: ThemeData.dark(),
-      themeMode: ThemeMode.system,
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
     );
   }
 }
