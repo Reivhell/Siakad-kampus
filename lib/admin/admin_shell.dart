@@ -1,13 +1,32 @@
 import 'package:flutter/material.dart';
 
-import 'dashboard/admin_dashboard_page.dart';
+import 'pages/curriculum_page.dart';
+import 'pages/civitas_page.dart';
+import 'pages/admin_dashboard_page.dart';
+import 'pages/transfer_page.dart';
+import 'pages/krs_page.dart';
+import 'pages/audit_page.dart';
+import 'pages/master_page.dart';
 import 'models/admin_nav.dart';
+import 'pages/grades_page.dart';
+import 'pages/feeder_page.dart';
+import 'pages/scheduling_page.dart';
+import 'pages/attendance_page.dart';
+import 'pages/letters_page.dart';
+import 'pages/users_page.dart';
+import 'pages/advisor_page.dart';
+import 'pages/graduation_page.dart';
+import 'widgets/feedback.dart';
 
 /// Shell responsif M3 — satu codebase tiga platform (design.md §5).
 /// ≥1024: NavigationDrawer + header. 600–1023: NavigationRail.
 /// <600: AppBar + NavigationBar 5 tab (design.md §5.2).
 class AdminShell extends StatefulWidget {
-  const AdminShell({super.key});
+  /// 4 digit terakhir NPM untuk avatar. [onLogout] null → tanpa menu keluar.
+  final String userLabel;
+  final VoidCallback? onLogout;
+
+  const AdminShell({super.key, this.userLabel = 'A', this.onLogout});
 
   @override
   State<AdminShell> createState() => _AdminShellState();
@@ -15,6 +34,7 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   int _index = 0;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +89,7 @@ class _AdminShellState extends State<AdminShell> {
             Expanded(
               child: Column(
                 children: [
-                  const _TopHeader(),
+                  _TopHeader(userLabel: widget.userLabel, onLogout: widget.onLogout),
                   Expanded(child: _Content(index: _index)),
                 ],
               ),
@@ -83,10 +103,13 @@ class _AdminShellState extends State<AdminShell> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('SIAKAD'),
-          actions: const [
+          actions: [
             Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: CircleAvatar(child: Text('A')),
+              padding: const EdgeInsets.only(right: 12),
+              child: _AccountMenu(
+                label: widget.userLabel,
+                onLogout: widget.onLogout,
+              ),
             ),
           ],
         ),
@@ -123,30 +146,32 @@ class _AdminShellState extends State<AdminShell> {
         ),
         body: Column(
           children: [
-            const _TopHeader(),
+            _TopHeader(userLabel: widget.userLabel, onLogout: widget.onLogout),
             Expanded(child: _Content(index: _index)),
           ],
         ),
       );
     }
 
-    // Mobile View
-    final mobileTabs = [0, 5, 6, 7, 14]; 
-    final bottomIndex = mobileTabs.indexOf(_index).clamp(0, 4);
+    // Mobile View — 4 tab modul + Menu pembuka drawer.
+    const mobileTabs = [0, 5, 6, 7];
+    final pos = mobileTabs.indexOf(_index);
+    final bottomIndex = pos < 0 ? 4 : pos;
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: const Text('SIAKAD'),
         actions: [
           IconButton(
             tooltip: 'Notifikasi',
-            onPressed: () {},
+            onPressed: () => soon(context, 'Pusat notifikasi'),
             icon: const Badge(
               label: Text('8'),
               child: Icon(Icons.notifications_outlined),
             ),
           ),
           const SizedBox(width: 4),
-          const CircleAvatar(child: Text('A')),
+          _AccountMenu(label: widget.userLabel, onLogout: widget.onLogout),
           const SizedBox(width: 12),
         ],
       ),
@@ -184,7 +209,13 @@ class _AdminShellState extends State<AdminShell> {
       body: _Content(index: _index),
       bottomNavigationBar: NavigationBar(
         selectedIndex: bottomIndex,
-        onDestinationSelected: (i) => setState(() => _index = mobileTabs[i]),
+        onDestinationSelected: (i) {
+          if (i == 4) {
+            _scaffoldKey.currentState?.openDrawer();
+          } else {
+            setState(() => _index = mobileTabs[i]);
+          }
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
@@ -260,7 +291,10 @@ class _Brand extends StatelessWidget {
 }
 
 class _TopHeader extends StatelessWidget {
-  const _TopHeader();
+  final String userLabel;
+  final VoidCallback? onLogout;
+
+  const _TopHeader({this.userLabel = 'A', this.onLogout});
 
   @override
   Widget build(BuildContext context) {
@@ -273,22 +307,47 @@ class _TopHeader extends StatelessWidget {
               hintText: 'Cari MK / NIM / NIDN…  (Ctrl+F)',
               leading: const Icon(Icons.search),
               elevation: const WidgetStatePropertyAll(0),
-              onTap: () {},
+              onTap: () => soon(context, 'Pencarian global'),
             ),
           ),
           const SizedBox(width: 12),
           IconButton(
             tooltip: 'Notifikasi (8)',
-            onPressed: () {},
+            onPressed: () => soon(context, 'Pusat notifikasi'),
             icon: const Badge(
               label: Text('8'),
               child: Icon(Icons.notifications_outlined),
             ),
           ),
           const SizedBox(width: 4),
-          const CircleAvatar(child: Text('A')),
+          _AccountMenu(label: userLabel, onLogout: onLogout),
         ],
       ),
+    );
+  }
+}
+
+class _AccountMenu extends StatelessWidget {
+  final String label;
+  final VoidCallback? onLogout;
+
+  const _AccountMenu({required this.label, this.onLogout});
+
+  @override
+  Widget build(BuildContext context) {
+    final avatar = CircleAvatar(child: Text(label));
+    final logout = onLogout;
+    if (logout == null) return avatar;
+    return PopupMenuButton<String>(
+      tooltip: 'Akun',
+      offset: const Offset(0, 48),
+      onSelected: (v) {
+        if (v == 'logout') logout();
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 'logout', child: Text('Keluar')),
+      ],
+      child: avatar,
     );
   }
 }
@@ -300,6 +359,20 @@ class _Content extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (index == 0) return const AdminDashboardPage();
+    if (index == 1) return const UsersPage();
+    if (index == 2) return const MasterPage();
+    if (index == 3) return const CurriculumPage();
+    if (index == 4) return const CivitasPage();
+    if (index == 5) return const SchedulingPage();
+    if (index == 6) return const KrsPage();
+    if (index == 7) return const GradesPage();
+    if (index == 8) return const AttendancePage();
+    if (index == 9) return const AdvisorPage();
+    if (index == 10) return const GraduationPage();
+    if (index == 11) return const TransferPage();
+    if (index == 12) return const FeederPage();
+    if (index == 13) return const LettersPage();
+    if (index == 14) return const AuditPage();
     final dest = adminDestinations[index];
     return Center(
       child: Padding(
@@ -312,7 +385,7 @@ class _Content extends StatelessWidget {
             Text(dest.label, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(
-              '${dest.route} — dibangun pada fase berikutnya.\nDashboard Fase 1 sudah fungsional penuh.',
+              '${dest.route} — selesai di Fase 5.\nSeluruh 15 modul fungsional penuh.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),

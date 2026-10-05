@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'admin/admin_shell.dart';
 import 'app/theme/siakad_theme.dart';
+import 'auth/auth_gate.dart';
 
 void main() {
   runApp(const SiakadApp());
@@ -16,7 +16,7 @@ class SiakadApp extends StatelessWidget {
       title: 'SIAKAD KAMPUS',
       theme: SiakadTheme.light,
       darkTheme: SiakadTheme.dark,
-      home: const AdminShell(),
+      home: const AuthGate(),
       debugShowCheckedModeBanner: false,
     );
   }

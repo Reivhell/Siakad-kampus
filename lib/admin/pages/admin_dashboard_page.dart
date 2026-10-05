@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/dashboard_seed.dart';
 import '../widgets/bezel_card.dart';
+import '../widgets/feedback.dart';
 import '../widgets/kpi_card.dart';
 import '../widgets/reveal.dart';
 import '../widgets/section_header.dart';
@@ -195,7 +196,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               onSelected: (v) => setState(() => _autoRefresh = v),
             ),
             FilledButton.icon(
-              onPressed: () {},
+              onPressed: () => soon(context, 'Ekspor snapshot PDF'),
               icon: const Icon(Icons.download_outlined, size: 18),
               label: const Text('Ekspor Snapshot'),
             ),
@@ -283,7 +284,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       visualDensity: VisualDensity.compact,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    onPressed: () {},
+                    onPressed: () =>
+                        soon(context, DashboardSeed.warnings[i].action),
                     child: Text(DashboardSeed.warnings[i].action),
                   ),
                 ),
@@ -417,7 +419,7 @@ class _QuickActions extends StatelessWidget {
                   ActionChip(
                     avatar: Icon(icon, size: 18),
                     label: Text(label),
-                    onPressed: () {},
+                    onPressed: () => soon(context, label),
                   ),
               ],
             ),
@@ -428,8 +430,33 @@ class _QuickActions extends StatelessWidget {
   }
 }
 
-class _TaskQueue extends StatelessWidget {
+class _TaskQueue extends StatefulWidget {
   const _TaskQueue();
+
+  @override
+  State<_TaskQueue> createState() => _TaskQueueState();
+}
+
+class _TaskQueueState extends State<_TaskQueue> {
+  // Elemen bertipe seed privat (inferred) — cukup butuh .title/.sub.
+  late List _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _items = List.of(DashboardSeed.queue);
+  }
+
+  void _decide(int i, bool approve) {
+    final t = _items[i];
+    setState(() => _items.removeAt(i));
+    ok(
+      context,
+      approve
+          ? 'Disetujui: ${t.title}. Audit tercatat.'
+          : 'Ditolak: ${t.title}. Pemohon dinotifikasi.',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -446,30 +473,38 @@ class _TaskQueue extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                const StatusBadge(
-                  label: '8 pending',
+                StatusBadge(
+                  label: '${_items.length} pending',
                   tone: BadgeTone.pending,
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            for (final t in DashboardSeed.queue) ...[
+            if (_items.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Antrean kosong — semua disposisi selesai.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            for (var i = 0; i < _items.length; i++) ...[
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.inbox_outlined),
-                title: Text(t.title),
-                subtitle: Text(t.sub),
+                title: Text(_items[i].title),
+                subtitle: Text(_items[i].sub),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
                       tooltip: 'Setujui',
-                      onPressed: () {},
+                      onPressed: () => _decide(i, true),
                       icon: const Icon(Icons.check_circle_outline),
                     ),
                     IconButton(
                       tooltip: 'Tolak',
-                      onPressed: () {},
+                      onPressed: () => _decide(i, false),
                       icon: const Icon(Icons.cancel_outlined),
                     ),
                   ],
@@ -638,7 +673,7 @@ class _LiveLog extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () => soon(context, 'Log lengkap (/admin/logs)'),
                   child: const Text('Lihat Semua'),
                 ),
               ],
@@ -686,7 +721,7 @@ class _Broadcast extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             FilledButton.tonalIcon(
-              onPressed: () {},
+              onPressed: () => soon(context, 'Buat broadcast'),
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Buat Broadcast'),
             ),
@@ -744,11 +779,16 @@ class _QuickDock extends StatelessWidget {
   final bool isDesktop;
   const _QuickDock({required this.isDesktop});
 
+  static void _sheetGo(BuildContext context, String fitur) {
+    Navigator.pop(context);
+    soon(context, fitur);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isDesktop) {
       return FloatingActionButton.extended(
-        onPressed: () {},
+        onPressed: () => soon(context, 'Aksi cepat'),
         icon: const Icon(Icons.bolt_outlined),
         label: const Text('Aksi Cepat'),
       );
@@ -766,22 +806,22 @@ class _QuickDock extends StatelessWidget {
               runSpacing: 8,
               children: [
                 FilledButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _sheetGo(context, 'Registrasi Mahasiswa'),
                   icon: const Icon(Icons.person_add_outlined, size: 18),
                   label: const Text('Mahasiswa'),
                 ),
                 FilledButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _sheetGo(context, 'Buka Kelas'),
                   icon: const Icon(Icons.meeting_room_outlined, size: 18),
                   label: const Text('Kelas'),
                 ),
                 FilledButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _sheetGo(context, 'Registrasi Dosen'),
                   icon: const Icon(Icons.co_present_outlined, size: 18),
                   label: const Text('Dosen'),
                 ),
                 FilledButton.tonalIcon(
-                  onPressed: () {},
+                  onPressed: () => _sheetGo(context, 'Broadcast'),
                   icon: const Icon(Icons.campaign_outlined, size: 18),
                   label: const Text('Broadcast'),
                 ),
