@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:siakad_kampus/admin/dashboard/admin_dashboard_page.dart';
+import 'package:siakad_kampus/admin/pages/admin_dashboard_page.dart';
 import 'package:siakad_kampus/app/theme/siakad_theme.dart';
 
 Widget _wrap(Widget child) =>

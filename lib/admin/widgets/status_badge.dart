@@ -60,9 +60,15 @@ class StatusBadge extends StatelessWidget {
           children: [
             Icon(icon, size: 10, color: fg),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(color: fg),
+            // Cap 260: label panjang wrap, bukan melebar. Menjaga badge
+            // muat di baris HP 314px; aman di DataTable (intrinsic-safe,
+            // tanpa LayoutBuilder/Flexible yang merusak layout induk).
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 260),
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(color: fg),
+              ),
             ),
           ],
         ),

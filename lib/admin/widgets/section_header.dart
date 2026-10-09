@@ -42,7 +42,10 @@ class SectionHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              Text(title, style: Theme.of(context).textTheme.headlineMedium),
+              Semantics(
+                header: true,
+                child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
+              ),
               if (subtitle != null) ...[
                 const SizedBox(height: 4),
                 Text(

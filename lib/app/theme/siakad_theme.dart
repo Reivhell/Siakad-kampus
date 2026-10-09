@@ -16,8 +16,12 @@ abstract class SiakadTheme {
       colorScheme: const ColorScheme.light(
         primary: AppColors.indigoBlue,
         onPrimary: Colors.white,
+        primaryContainer: Color(0xFFDCE6FF),
+        onPrimaryContainer: AppColors.indigoBlue,
         secondary: AppColors.goldAccent,
         onSecondary: AppColors.lightTextPrimary,
+        secondaryContainer: AppColors.lightSurfaceRaised,
+        onSecondaryContainer: AppColors.lightTextPrimary,
         surface: AppColors.lightSurface,
         onSurface: AppColors.lightTextPrimary,
         error: AppColors.destructive,
@@ -30,6 +34,7 @@ abstract class SiakadTheme {
         backgroundColor: AppColors.indigoBlue,
         foregroundColor: Colors.white,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: false,
       ),
       cardTheme: const CardThemeData(
@@ -68,6 +73,11 @@ abstract class SiakadTheme {
         shape: RoundedRectangleBorder(borderRadius: radiusMd),
       ),
       dividerTheme: const DividerThemeData(color: AppColors.lightBorder, space: 1),
+      // Teks tile terpilih = indigo (8.1:1 di atas secondaryContainer).
+      // Default M3 (primary) juga lolos di light, eksplisit agar terkunci.
+      listTileTheme: const ListTileThemeData(
+        selectedColor: AppColors.indigoBlue,
+      ),
     );
   }
 
@@ -77,8 +87,12 @@ abstract class SiakadTheme {
       colorScheme: const ColorScheme.dark(
         primary: AppColors.darkPrimary,
         onPrimary: AppColors.darkBg,
+        primaryContainer: AppColors.darkSurfaceInteractive,
+        onPrimaryContainer: Color(0xFFDCE6FF),
         secondary: AppColors.darkGold,
         onSecondary: AppColors.darkBg,
+        secondaryContainer: AppColors.darkSurfaceInteractive,
+        onSecondaryContainer: AppColors.darkTextPrimary,
         surface: AppColors.darkSurface,
         onSurface: AppColors.darkTextPrimary,
         error: AppColors.darkDanger,
@@ -91,6 +105,7 @@ abstract class SiakadTheme {
         backgroundColor: AppColors.darkSurface,
         foregroundColor: AppColors.darkTextPrimary,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: false,
       ),
       cardTheme: const CardThemeData(
@@ -125,6 +140,11 @@ abstract class SiakadTheme {
         shape: RoundedRectangleBorder(borderRadius: radiusMd),
       ),
       dividerTheme: const DividerThemeData(color: AppColors.darkBorder, space: 1),
+      // Teks tile terpilih = starlight (~7:1). Default M3 (primary #4F75FF)
+      // hanya 2.6:1 di atas secondaryContainer — gagal AA, dilarang.
+      listTileTheme: const ListTileThemeData(
+        selectedColor: AppColors.darkTextPrimary,
+      ),
     );
   }
 }

@@ -68,4 +68,44 @@ void main() {
       expect(contrast(AppColors.goldAccent, AppColors.lightBg), lessThan(4.5));
     });
   });
+
+  group('StatusBadge dark combos (status_badge.dart)', () {
+    test('jewel di atas tint badge dark ≥ 4.5', () {
+      expect(
+        contrast(
+          AppColors.darkPass,
+          const Color(0xFF0C2B22),
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(
+          AppColors.darkAlert,
+          const Color(0xFF33240A),
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(
+          AppColors.darkDanger,
+          const Color(0xFF3B0F1B),
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(
+          AppColors.darkInfo,
+          const Color(0xFF0B2636),
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(
+          AppColors.darkTextSecondary,
+          AppColors.darkSurfaceInteractive,
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+  });
 }
