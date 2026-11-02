@@ -1,6 +1,6 @@
 import 'app_user.dart';
 
-/// Seed 6 akun: 2 admin (guard last-admin teruji), 2 dosen, 2 mhs.
+/// Seed akun: 2 admin (guard last-admin teruji), 2 dosen, 3 mahasiswa.
 List<AppUser> seedUsers() => [
   AppUser(
     id: 'u-admin-1',
@@ -49,6 +49,14 @@ List<AppUser> seedUsers() => [
     status: AccountStatus.terkunci,
     hasRelations: true,
     lastLogin: 'Kemarin',
+  ),
+  AppUser(
+    id: 'u-mhs-3',
+    nama: 'Reza Pratama',
+    email: 'reza.241016@mhs.kampus.ac.id',
+    roles: {UserRole.mahasiswa},
+    hasRelations: true,
+    lastLogin: '5 mnt lalu',
   ),
 ];
 

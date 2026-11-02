@@ -54,9 +54,20 @@ abstract class AppColors {
   static const Color darkPrimary = Color(0xFF4F75FF);
   static const Color darkGold = Color(0xFFF5CD68); // 11.75:1 di atas darkSurface
 
-  // Dark Semantics
+  // Dark Semantics — ink (teks di atas dark*Surface)
   static const Color darkPass = Color(0xFF32D583);
   static const Color darkAlert = Color(0xFFF7B944);
   static const Color darkDanger = Color(0xFFF43F5E);
   static const Color darkInfo = Color(0xFF38BDF8);
+
+  // Dark Semantics — surface & border (banner/badge). Dipasangkan dengan
+  // `dark*` ink di atasnya; semua pasangan ink-surface diuji >= 4.5:1.
+  static const Color darkPassSurface = Color(0xFF0C2B22);
+  static const Color darkPassBorder = Color(0xFF14532D);
+  static const Color darkAlertSurface = Color(0xFF33240A);
+  static const Color darkAlertBorder = Color(0xFF92400E);
+  static const Color darkDangerSurface = Color(0xFF3B0F1B);
+  static const Color darkDangerBorder = Color(0xFF9F1239);
+  static const Color darkInfoSurface = Color(0xFF0B2636);
+  static const Color darkInfoBorder = Color(0xFF0C4A6E);
 }

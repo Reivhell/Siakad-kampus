@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:siakad_kampus/admin/admin_shell.dart';
 import 'package:siakad_kampus/app/theme/app_colors.dart';
+import 'package:siakad_kampus/features/auth/login_page.dart';
 import 'package:siakad_kampus/main.dart';
 
 Future<void> _setSurface(WidgetTester tester) async {
@@ -17,10 +18,10 @@ void main() {
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
     addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
 
-    await tester.pumpWidget(const SiakadApp());
+    await tester.pumpWidget(const ProviderScope(child: SiakadApp()));
     await tester.pump(const Duration(milliseconds: 800));
     await tester.pumpAndSettle();
-    final ctx = tester.element(find.byType(AdminShell));
+    final ctx = tester.element(find.byType(LoginPage));
     final theme = Theme.of(ctx);
 
     expect(theme.colorScheme.primary, AppColors.indigoBlue);
@@ -32,10 +33,10 @@ void main() {
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
     addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
 
-    await tester.pumpWidget(const SiakadApp());
+    await tester.pumpWidget(const ProviderScope(child: SiakadApp()));
     await tester.pump(const Duration(milliseconds: 800));
     await tester.pumpAndSettle();
-    final theme = Theme.of(tester.element(find.byType(AdminShell)));
+    final theme = Theme.of(tester.element(find.byType(LoginPage)));
 
     expect(theme.colorScheme.primary, AppColors.darkPrimary);
     expect(theme.scaffoldBackgroundColor, AppColors.darkBg);

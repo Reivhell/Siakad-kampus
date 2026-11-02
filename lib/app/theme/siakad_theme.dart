@@ -25,7 +25,10 @@ abstract class SiakadTheme {
         outline: AppColors.lightBorder,
       ),
       scaffoldBackgroundColor: AppColors.lightBg,
-      textTheme: AppTypography.textTheme,
+      textTheme: AppTypography.textTheme.apply(
+        bodyColor: AppColors.lightTextPrimary,
+        displayColor: AppColors.lightTextPrimary,
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.indigoBlue,
         foregroundColor: Colors.white,
@@ -86,7 +89,12 @@ abstract class SiakadTheme {
         outline: AppColors.darkBorder,
       ),
       scaffoldBackgroundColor: AppColors.darkBg,
-      textTheme: AppTypography.textTheme,
+      // AppTypography dibangun dari ThemeData.light() — tanpa `.apply` warna
+      // teks tetap hitam dan tidak terbaca di kanvas Nocturne.
+      textTheme: AppTypography.textTheme.apply(
+        bodyColor: AppColors.darkTextPrimary,
+        displayColor: AppColors.darkTextPrimary,
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.darkSurface,
         foregroundColor: AppColors.darkTextPrimary,

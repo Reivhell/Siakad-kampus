@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'dashboard/admin_dashboard_page.dart';
+import 'krs/admin_krs_page.dart';
 import 'models/admin_nav.dart';
 
 /// Shell responsif M3 — satu codebase tiga platform (design.md §5).
@@ -300,6 +301,7 @@ class _Content extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (index == 0) return const AdminDashboardPage();
+    if (index == 6) return const AdminKrsPage();
     final dest = adminDestinations[index];
     return Center(
       child: Padding(

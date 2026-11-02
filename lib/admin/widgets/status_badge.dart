@@ -26,21 +26,21 @@ class StatusBadge extends StatelessWidget {
     late Color border;
     switch (tone) {
       case BadgeTone.success:
-        bg = dark ? const Color(0xFF0C2B22) : AppColors.passSurface;
+        bg = dark ? AppColors.darkPassSurface : AppColors.passSurface;
         fg = dark ? AppColors.darkPass : AppColors.passInk;
-        border = dark ? const Color(0xFF14532D) : const Color(0xFFBBF7D0);
+        border = dark ? AppColors.darkPassBorder : const Color(0xFFBBF7D0);
       case BadgeTone.pending:
-        bg = dark ? const Color(0xFF33240A) : AppColors.alertSurface;
+        bg = dark ? AppColors.darkAlertSurface : AppColors.alertSurface;
         fg = dark ? AppColors.darkAlert : AppColors.alertInk;
-        border = dark ? const Color(0xFF92400E) : const Color(0xFFFDE68A);
+        border = dark ? AppColors.darkAlertBorder : const Color(0xFFFDE68A);
       case BadgeTone.danger:
-        bg = dark ? const Color(0xFF3B0F1B) : AppColors.warningSurface;
+        bg = dark ? AppColors.darkDangerSurface : AppColors.warningSurface;
         fg = dark ? AppColors.darkDanger : AppColors.dangerInk;
-        border = dark ? const Color(0xFF9F1239) : const Color(0xFFFECACA);
+        border = dark ? AppColors.darkDangerBorder : const Color(0xFFFECACA);
       case BadgeTone.info:
-        bg = dark ? const Color(0xFF0B2636) : AppColors.infoSurface;
+        bg = dark ? AppColors.darkInfoSurface : AppColors.infoSurface;
         fg = dark ? AppColors.darkInfo : AppColors.infoInk;
-        border = dark ? const Color(0xFF0C4A6E) : const Color(0xFFBAE6FD);
+        border = dark ? AppColors.darkInfoBorder : const Color(0xFFBAE6FD);
       case BadgeTone.neutral:
         bg = dark ? AppColors.darkSurfaceInteractive : AppColors.lightSurfaceRaised;
         fg = dark ? AppColors.darkTextSecondary : AppColors.neutralInk;
