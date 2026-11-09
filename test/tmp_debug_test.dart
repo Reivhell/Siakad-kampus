@@ -1,7 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 
-import 'package:siakad_kampus/auth/login_page.dart';
+import 'package:siakad_kampus/shared/api_client.dart';
+import 'package:siakad_kampus/shared/app_session.dart';
+import 'package:siakad_kampus/shared/login/login_page.dart';
 
 void main() {
   testWidgets('debug tree', (tester) async {
@@ -10,7 +16,10 @@ void main() {
     addTearDown(() => tester.view.resetPhysicalSize());
 
     await tester.pumpWidget(MaterialApp(
-      home: LoginPage(onSuccess: (_) {}),
+      home: LoginPage(
+        onSuccess: (session) {},
+        apiClient: ApiClient(baseUrl: 'http://test', client: _FakeHttpClient()),
+      ),
     ));
     await tester.pump(const Duration(milliseconds: 800));
     await tester.pumpAndSettle();
@@ -27,4 +36,17 @@ void main() {
     final e = tester.takeException();
     debugPrint('EX: $e');
   });
+}
+
+class _FakeHttpClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final body = '{}';
+    final bytes = utf8.encode(body);
+    return http.StreamedResponse(
+      Stream.value(bytes),
+      200,
+      headers: {'content-type': 'application/json'},
+    );
+  }
 }

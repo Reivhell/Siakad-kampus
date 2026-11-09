@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../models/fase5b_seed.dart';
 import '../models/feeder.dart';
+import '../rules/admin_rules.dart';
+import '../widgets/admin_page.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/feedback.dart';
 import '../widgets/reveal.dart';
 import '../widgets/section_header.dart';
 import '../widgets/status_badge.dart';
+import '../widgets/admin_dialog.dart';
 
 /// PDDIKTI (spec 13): skor kesiapan + 7 paket + anomali + preview CSV.
 class FeederPage extends StatefulWidget {
@@ -26,12 +29,31 @@ class _FeederPageState extends State<FeederPage> {
     _issues = seedFeederIssues();
   }
 
+  void _exportCsv() {
+    final preview = AdminRules.csvRow(['npm', 'nama', 'nik', 'status']);
+    showAdminForm<void>(
+      context: context,
+      title: 'Ekspor CSV Neo Feeder',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Paket AKM + Biodata — separator ; • UTF-8 • quote-escape.'),
+          const SizedBox(height: 12),
+          SelectableText('$preview\n${AdminRules.csvRow(['2210010001', 'Aditya Pratama', '3501000100000001', 'A'])}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
+          const SizedBox(height: 12),
+          Align(alignment: Alignment.centerRight, child: FilledButton.tonalIcon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.check, size: 18), label: const Text('Tutup'))),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     const total = 1420;
     final valid = total - _issues.length;
-    final score = readinessScore(valid, total);
+    final score = AdminRules.readiness(valid, total);
     const pakets = [
       ('Biodata Maba', 1.0, '350 data'),
       ('Kurikulum & MK', 1.0, '52 MK'),
@@ -56,8 +78,7 @@ class _FeederPageState extends State<FeederPage> {
                 child: SectionHeader(
                   eyebrow: 'Admin / PDDIKTI',
                   title: 'Pelaporan Neo Feeder',
-                  subtitle:
-                      'Tenggat 31 Mar 2026 • separator ; • UTF-8 • quote-escape',
+                  subtitle: 'Tenggat 31 Mar 2026 • separator ; • UTF-8 • quote-escape',
                   action: FilledButton.icon(
                     onPressed: () => setState(() => _ran = true),
                     icon: const Icon(Icons.play_arrow_outlined, size: 18),
@@ -126,8 +147,7 @@ class _FeederPageState extends State<FeederPage> {
                     child: Reveal(
                       delayMs: (i * 40).clamp(0, 200),
                       child: BezelCard(
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
+                        child: AdminListRow(
                           title: Text(
                             '[${_issues[i].category}] ${_issues[i].name}',
                           ),
@@ -156,14 +176,15 @@ class _FeederPageState extends State<FeederPage> {
                 child: SectionHeader(
                   eyebrow: 'Preview',
                   title: 'Contoh Baris CSV',
-                  subtitle: 'akm.csv: id_reg;npm;periode;ips;ipk;sks;total;status',
+                  subtitle:
+                      'akm.csv: id_reg;npm;periode;ips;ipk;sks;total;status',
                 ),
               ),
               const SizedBox(height: 8),
               Reveal(
                 child: BezelCard(
                   child: SelectableText(
-                    csvRow([
+                    AdminRules.csvRow([
                       'REG-001',
                       '2610010001',
                       'Ganjil 2025/2026',
@@ -173,10 +194,20 @@ class _FeederPageState extends State<FeederPage> {
                       '20',
                       'A',
                     ]),
-                    style: const TextStyle(
-                      fontFeatures: [FontFeature.tabularFigures()],
-                      fontSize: 12,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Reveal(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _exportCsv,
+                    icon: const Icon(Icons.download_outlined, size: 18),
+                    label: const Text('Ekspor CSV'),
                   ),
                 ),
               ),

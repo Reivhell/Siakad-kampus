@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 /// Entry reveal GPU-safe: hanya transform + opacity.
-/// Kurva massa-pegas: Cubic(0.32, 0.72, 0, 1), 700ms.
+/// Kurva massa-pegas: Cubic(0.32, 0.72, 0, 1).
+/// Hero (delay 0): 700ms. Stagger (delay > 0): 350ms — separuh ticker-time
+/// dashboard 20 Reveals (14000ms → ~7350ms) tanpa ubah rasa gerak.
 /// Jangan pakai untuk list panjang > 20 item sekaligus.
 class Reveal extends StatefulWidget {
   final Widget child;
@@ -25,7 +27,7 @@ class _RevealState extends State<Reveal> with SingleTickerProviderStateMixin {
     super.initState();
     _c = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: Duration(milliseconds: widget.delayMs > 0 ? 350 : 700),
     );
     _opacity = CurvedAnimation(parent: _c, curve: _curve);
     _slide = Tween<Offset>(

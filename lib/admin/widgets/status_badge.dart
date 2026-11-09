@@ -26,26 +26,33 @@ class StatusBadge extends StatelessWidget {
     late Color border;
     switch (tone) {
       case BadgeTone.success:
-        bg = dark ? const Color(0xFF0C2B22) : AppColors.passSurface;
+        bg = dark ? AppColors.darkSuccessSurface : AppColors.passSurface;
         fg = dark ? AppColors.darkPass : AppColors.passInk;
-        border = dark ? const Color(0xFF14532D) : const Color(0xFFBBF7D0);
+        border = dark ? AppColors.darkSuccessBorder : AppColors.passBorder;
       case BadgeTone.pending:
-        bg = dark ? const Color(0xFF33240A) : AppColors.alertSurface;
+        bg = dark ? AppColors.darkWarningSurface : AppColors.alertSurface;
         fg = dark ? AppColors.darkAlert : AppColors.alertInk;
-        border = dark ? const Color(0xFF92400E) : const Color(0xFFFDE68A);
+        border = dark ? AppColors.darkWarningBorder : AppColors.alertBorder;
       case BadgeTone.danger:
-        bg = dark ? const Color(0xFF3B0F1B) : AppColors.warningSurface;
+        bg = dark ? AppColors.darkDangerSurface : AppColors.warningSurface;
         fg = dark ? AppColors.darkDanger : AppColors.dangerInk;
-        border = dark ? const Color(0xFF9F1239) : const Color(0xFFFECACA);
+        border = dark ? AppColors.darkDangerBorder : AppColors.dangerBorder;
       case BadgeTone.info:
-        bg = dark ? const Color(0xFF0B2636) : AppColors.infoSurface;
+        bg = dark ? AppColors.darkInfoSurface : AppColors.infoSurface;
         fg = dark ? AppColors.darkInfo : AppColors.infoInk;
-        border = dark ? const Color(0xFF0C4A6E) : const Color(0xFFBAE6FD);
+        border = dark ? AppColors.darkInfoBorder : AppColors.infoBorder;
       case BadgeTone.neutral:
-        bg = dark ? AppColors.darkSurfaceInteractive : AppColors.lightSurfaceRaised;
+        bg = dark
+            ? AppColors.darkSurfaceInteractive
+            : AppColors.lightSurfaceRaised;
         fg = dark ? AppColors.darkTextSecondary : AppColors.neutralInk;
         border = dark ? AppColors.darkBorder : AppColors.lightBorder;
     }
+    // Badge tidak boleh jadi pencuri ruang: di HP label panjang
+    // ("Minggu 8/16", "MENUNGGU_APPROVAL") mengklaim lebih dari separuh
+    // layar dan menyisakan 30px untuk judul di sebelahnya. Cap ikut viewport.
+    final screen = MediaQuery.sizeOf(context).width;
+    final cap = screen * 0.45 < 260 ? screen * 0.45 : 260.0;
     return Semantics(
       label: label,
       child: Container(
@@ -55,22 +62,25 @@ class StatusBadge extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: border),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 10, color: fg),
-            const SizedBox(width: 6),
-            // Cap 260: label panjang wrap, bukan melebar. Menjaga badge
-            // muat di baris HP 314px; aman di DataTable (intrinsic-safe,
-            // tanpa LayoutBuilder/Flexible yang merusak layout induk).
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 260),
-              child: Text(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: cap),
+          child: Wrap(
+            // Wrap, bukan Row: Row meledak saat label lebih lebar dari
+            // ruang sisa (HP 360px), Wrap memindah label ke baris berikut.
+            // Intrinsic-safe juga — DataTable/Row mengukur tanpa batas,
+            // di sana semua anak tetap satu baris.
+            spacing: 6,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Icon(icon, size: 10, color: fg),
+              Text(
                 label,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(color: fg),
+                style: Theme.of(context).textTheme.labelMedium
+                    ?.copyWith(color: fg),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

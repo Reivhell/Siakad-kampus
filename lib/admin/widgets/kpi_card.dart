@@ -43,45 +43,55 @@ class KpiCard extends StatelessWidget {
                 ),
                 child: Icon(icon, size: 20, color: cs.primary),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               if (starGold)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: dark
-                        ? AppColors.darkGold.withValues(alpha: 0.14)
-                        : const Color(0xFFFFF9C4),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: dark
-                          ? AppColors.darkGold.withValues(alpha: 0.4)
-                          : const Color(0xFFFDE68A),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.star_rounded,
-                        size: 14,
+                // Flexible, bukan Spacer + badge tetap: pada kartu sempit
+                // (desktop 1024, teks besar) 40px ikon + badge "Cumlaude"
+                // melebihi lebar kartu dan meluber 18px.
+                Flexible(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
                         color: dark
-                            ? AppColors.darkGold
-                            : const Color(0xFFA16207),
+                            ? AppColors.darkGold.withValues(alpha: 0.14)
+                            : AppColors.goldSurface,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: dark
+                              ? AppColors.darkGold.withValues(alpha: 0.4)
+                              : AppColors.goldBorder,
+                        ),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Cumlaude',
-                        style: Theme.of(context).textTheme.labelSmall
-                            ?.copyWith(
-                              color: dark
-                                  ? AppColors.darkGold
-                                  : const Color(0xFF854D0E),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.star_rounded,
+                            size: 14,
+                            color: dark
+                                ? AppColors.darkGold
+                                : AppColors.goldIcon,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Cumlaude',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: dark
+                                        ? AppColors.darkGold
+                                        : AppColors.goldInk,
+                                  ),
                             ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
             ],

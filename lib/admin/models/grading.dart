@@ -1,3 +1,5 @@
+import '../rules/admin_thresholds.dart';
+
 /// Logika penilaian (spec 08): konversi 7-tier, NA, IPS/IPK, unlock.
 class GradeResult {
   final String huruf;
@@ -8,7 +10,9 @@ class GradeResult {
 
 /// Konversi 08 §4.1 — batas inklusif bawah tiap tier.
 GradeResult convertScore(double s) {
-  if (s < 0 || s > 100) throw ArgumentError('Skor 0–100.');
+  if (s < AdminThresholds.scoreMin || s > AdminThresholds.scoreMax) {
+    throw ArgumentError('Skor 0–100.');
+  }
   if (s >= 85) return const GradeResult('A', 4.0, 'Sangat Baik');
   if (s >= 80) return const GradeResult('AB', 3.5, 'Antara Sangat Baik dan Baik');
   if (s >= 75) return const GradeResult('B', 3.0, 'Baik');

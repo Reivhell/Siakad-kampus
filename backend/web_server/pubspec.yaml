@@ -1,0 +1,20 @@
+name: sia_web_server
+description: SIAKAD HTTP API (dart_frog).
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  dart_frog: ^1.2.6
+  dotenv: ^4.2.0
+  sia_backend_core:
+    path: ../sia_backend_core
+  sia_backend_postgres:
+    path: ../sia_backend_postgres
+  sia_backend_supabase:
+    path: ../sia_backend_supabase
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.33.0

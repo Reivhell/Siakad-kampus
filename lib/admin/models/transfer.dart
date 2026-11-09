@@ -1,3 +1,5 @@
+import '../rules/admin_thresholds.dart';
+
 /// Konversi & transfer kredit (spec 14): pola, guard, cap.
 class TransferMap {
   final String asalKode;
@@ -39,14 +41,16 @@ String? guardAsalHuruf(String huruf) {
 
 /// Cap regulasi: total ≤ 100 SKS S1; paket MBKM ≤ 20/semester.
 String? transferCapCheck(int totalDiakui) {
-  if (totalDiakui > 100) {
-    return 'Total $totalDiakui SKS > 100 — wajib ≥36 SKS lokal.';
+  if (totalDiakui > AdminThresholds.sksTransferMax) {
+    return 'Total $totalDiakui SKS > ${AdminThresholds.sksTransferMax} — wajib ≥36 SKS lokal.';
   }
   return null;
 }
 
 String? mbkmCapCheck(int paketSks) {
-  if (paketSks > 20) return 'Paket MBKM $paketSks > plafon 20 SKS.';
+  if (paketSks > AdminThresholds.sksMbkmPaketMax) {
+    return 'Paket MBKM $paketSks > plafon ${AdminThresholds.sksMbkmPaketMax} SKS.';
+  }
   return null;
 }
 

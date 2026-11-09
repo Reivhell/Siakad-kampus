@@ -1,4 +1,10 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+
+bool _isApple(BuildContext context) {
+  final p = Theme.of(context).platform;
+  return p == TargetPlatform.iOS || p == TargetPlatform.macOS;
+}
 
 /// Dialog adaptif: AlertDialog di desktop/tablet, bottom sheet di mobile.
 /// Lebar max 560 agar form tetap ramping di web.
@@ -9,6 +15,19 @@ Future<T?> showAdminForm<T>({
 }) {
   final width = MediaQuery.sizeOf(context).width;
   if (width < 600) {
+    if (_isApple(context)) {
+      return showCupertinoModalPopup<T>(
+        context: context,
+        builder: (_) => CupertinoActionSheet(
+          title: Text(title),
+          message: SingleChildScrollView(child: child),
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ),
+      );
+    }
     return showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
@@ -30,6 +49,21 @@ Future<T?> showAdminForm<T>({
             ],
           ),
         ),
+      ),
+    );
+  }
+  if (_isApple(context)) {
+    return showCupertinoDialog<T>(
+      context: context,
+      builder: (_) => CupertinoAlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(child: child),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
       ),
     );
   }
@@ -76,6 +110,64 @@ class _ConfirmKeywordDialogState extends State<ConfirmKeywordDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final ok = _c.text.trim() == widget.keyword;
+    final field = _isApple(context)
+        ? CupertinoTextField(
+            controller: _c,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.done,
+            maxLength: 20,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) {
+              if (ok) Navigator.pop(context, true);
+            },
+            placeholder: 'KONFIRMASI',
+          )
+        : TextField(
+            controller: _c,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.done,
+            maxLength: 20,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) {
+              if (_c.text.trim() == widget.keyword) {
+                Navigator.pop(context, true);
+              }
+            },
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'KONFIRMASI',
+              counterText: '',
+            ),
+          );
+    if (_isApple(context)) {
+      return CupertinoAlertDialog(
+        title: Text(widget.title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.message),
+            const SizedBox(height: 12),
+            field,
+          ],
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: ok ? () => Navigator.pop(context, true) : null,
+            child: Text(widget.confirmLabel),
+          ),
+        ],
+      );
+    }
     return AlertDialog(
       title: Text(widget.title),
       content: Column(
@@ -85,16 +177,27 @@ class _ConfirmKeywordDialogState extends State<ConfirmKeywordDialog> {
           Text(widget.message),
           const SizedBox(height: 12),
           Text(
-            'Ketik "${widget.keyword}" untuk konfirmasi:',
+            'Ketik "${widget.keyword}" untuk lanjut:',
             style: Theme.of(context).textTheme.labelMedium,
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _c,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.done,
+            maxLength: 20,
             onChanged: (_) => setState(() {}),
+            onSubmitted: (_) {
+              if (_c.text.trim() == widget.keyword) {
+                Navigator.pop(context, true);
+              }
+            },
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               hintText: 'KONFIRMASI',
+              counterText: '',
             ),
           ),
         ],

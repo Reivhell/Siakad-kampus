@@ -1,0 +1,14 @@
+name: siakad_tool
+description: Database migration, seed, and verification CLI for SIAKAD.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.4
+dependencies:
+  args: ^2.7.0
+  dotenv: ^4.2.0
+  postgres: ^3.5.20
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.33.0

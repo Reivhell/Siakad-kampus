@@ -1,3 +1,5 @@
+import '../rules/admin_thresholds.dart';
+
 /// Logika presensi (spec 09): eligibility 75%, status pertemuan, proyeksi.
 class Eligibility {
   final bool eligible;
@@ -18,17 +20,18 @@ Eligibility evaluateUas({
   final pct = (hadir + dispensasi) / total * 100;
   final rounded = double.parse(pct.toStringAsFixed(2));
   return Eligibility(
-    rounded >= 75,
+    rounded >= AdminThresholds.uasMinPct,
     rounded,
-    rounded >= 75
-        ? 'Memenuhi syarat UAS (≥ 75%)'
+    rounded >= AdminThresholds.uasMinPct
+        ? 'Memenuhi syarat UAS (≥ ${AdminThresholds.uasMinPct.toStringAsFixed(0)}%)'
         : 'Hanya ${pct.toStringAsFixed(1)}% — tidak berhak UAS!',
   );
 }
 
 /// Flag TERTINGGAL 09 §3.1: minggu ≥ 10 tapi realisasi < 8.
 bool isBehindSchedule(int realisasi, int mingguBerjalan) =>
-    mingguBerjalan >= 10 && realisasi < 8;
+    mingguBerjalan >= AdminThresholds.behindWeek &&
+    realisasi < AdminThresholds.behindRealization;
 
 /// Status progres vs target linear (realisasi/16 vs minggu/16).
 String meetingTrack(int realisasi, int minggu) {

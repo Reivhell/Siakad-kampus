@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/admin_page.dart';
+
 import '../models/grades_seed.dart';
-import '../models/grading.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/admin_dialog.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/filter_bar.dart';
@@ -35,13 +37,7 @@ class _GradesPageState extends State<GradesPage> {
   }
 
   void _snack(String m, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(m),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-      ),
-    );
+    showAdminSnack(context, m, error: error);
   }
 
   Future<void> _unlock(KelasNilai k) async {
@@ -75,9 +71,9 @@ class _GradesPageState extends State<GradesPage> {
               ],
               onSelected: (v) => setS(() => jam = v ?? jam),
             ),
-            const Text(
+            Text(
               'Kunci kembali otomatis saat jendela berakhir (cron).',
-              style: TextStyle(fontSize: 12),
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
             Row(
@@ -104,9 +100,16 @@ class _GradesPageState extends State<GradesPage> {
       return;
     }
     final now = DateTime.now();
+    late final DateTime hingga;
+    try {
+      hingga = AdminRules.unlockUntil(now, jam);
+    } on StateError catch (e) {
+      _snack(e.message, error: true);
+      return;
+    }
     setState(() {
       k.finalisasi = false;
-      k.unlockHingga = unlockExpiry(now, jam);
+      k.unlockHingga = hingga;
     });
     _snack('${k.kode} terbuka $jam jam hingga ${k.unlockHingga}.');
   }
@@ -150,8 +153,7 @@ class _GradesPageState extends State<GradesPage> {
                 child: SectionHeader(
                   eyebrow: 'Admin / Nilai',
                   title: 'Monitoring Nilai',
-                  subtitle:
-                      'Batas finalisasi 28 Jan 2026 • reminder otomatis H-7/H-3',
+                  subtitle: 'Batas finalisasi 28 Jan 2026 • reminder otomatis H-7/H-3',
                 ),
               ),
               const SizedBox(height: 16),
@@ -207,8 +209,7 @@ class _GradesPageState extends State<GradesPage> {
                   child: Reveal(
                     delayMs: (i * 40).clamp(0, 240),
                     child: BezelCard(
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
+                      child: AdminListRow(
                         title: Text('[${list[i].kode}] ${list[i].mkNama}'),
                         subtitle: Text(
                           '${list[i].dosen} • ${list[i].terisi}/${list[i].peserta} terisi${list[i].unlockHingga != null ? ' • terbuka hingga ${list[i].unlockHingga}' : ''}',
@@ -246,7 +247,8 @@ class _GradesPageState extends State<GradesPage> {
                 child: SectionHeader(
                   eyebrow: 'Referensi',
                   title: 'Skala Konversi 7-Tier',
-                  subtitle: 'A 85+ • AB 80+ • B 75+ • BC 70+ • C 65+ • D 50+ • E <50',
+                  subtitle:
+                      'A 85+ • AB 80+ • B 75+ • BC 70+ • C 65+ • D 50+ • E <50',
                 ),
               ),
               const SizedBox(height: 8),
@@ -256,10 +258,18 @@ class _GradesPageState extends State<GradesPage> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      for (final s in [85.0, 82.0, 77.0, 72.0, 67.0, 55.0, 30.0])
+                      for (final s in [
+                        85.0,
+                        82.0,
+                        77.0,
+                        72.0,
+                        67.0,
+                        55.0,
+                        30.0,
+                      ])
                         Builder(
                           builder: (_) {
-                            final g = convertScore(s);
+                            final g = AdminRules.gradeForScore(s);
                             return Chip(
                               label: Text(
                                 '${s.toInt()} → ${g.huruf} (${g.bobot})',

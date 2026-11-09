@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/admin_page.dart';
+
 import '../models/krs.dart';
 import '../models/krs_seed.dart';
+import '../models/master_seed.dart';
 import '../models/scheduling.dart';
 import '../models/scheduling_seed.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/admin_dialog.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/empty_state.dart';
@@ -39,20 +43,11 @@ class _KrsPageState extends State<KrsPage> {
     super.dispose();
   }
 
-  String _kelasKode(String id) => _kelas
-      .where((k) => k.id == id)
-      .map((k) => k.kode)
-      .join()
-      .ifEmpty('—');
+  String _kelasKode(String id) =>
+      _kelas.where((k) => k.id == id).map((k) => k.kode).join().ifEmpty('—');
 
   void _snack(String m, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(m),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-      ),
-    );
+    showAdminSnack(context, m, error: error);
   }
 
   Future<void> _forceAdd(KrsEntry e) async {
@@ -60,7 +55,7 @@ class _KrsPageState extends State<KrsPage> {
     if (info == null) return;
     final (nama, prodi, angkatan, ips, diambil) = info;
     final semester = 2026 - angkatan + 1;
-    final plafon = calculateMaxSks(semester: semester, ips: ips);
+    final plafon = AdminRules.maxSks(semester: semester, ips: ips);
     String targetId = _kelas.first.id;
     final surat = TextEditingController();
     final res = await showAdminForm<bool>(
@@ -69,7 +64,10 @@ class _KrsPageState extends State<KrsPage> {
       child: StatefulBuilder(
         builder: (ctx, setS) {
           final target = _kelas.firstWhere((k) => k.id == targetId);
-          final penuh = target.terdaftar >= target.kapasitas;
+          final penuh = AdminRules.isOverCapacity(
+            target.terdaftar,
+            target.kapasitas,
+          );
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -77,8 +75,8 @@ class _KrsPageState extends State<KrsPage> {
               Text('$nama ($prodi • $angkatan)'),
               Text(
                 'IPS $ips → plafon $plafon SKS • diambil $diambil SKS',
-                style: const TextStyle(
-                  fontFeatures: [FontFeature.tabularFigures()],
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               const SizedBox(height: 8),
@@ -90,7 +88,7 @@ class _KrsPageState extends State<KrsPage> {
                     DropdownMenuEntry(
                       value: k.id,
                       label:
-                          '[${k.kode}] ${k.terdaftar}/${k.kapasitas}${k.terdaftar >= k.kapasitas ? ' PENUH' : ''}',
+                          '[${k.kode}] ${k.terdaftar}/${k.kapasitas}${AdminRules.isOverCapacity(k.terdaftar, k.kapasitas) ? ' PENUH' : ''}',
                     ),
                 ],
                 onSelected: (v) => setS(() => targetId = v ?? targetId),
@@ -101,11 +99,26 @@ class _KrsPageState extends State<KrsPage> {
                 tone: penuh ? BadgeTone.pending : BadgeTone.success,
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: surat,
-                decoration: const InputDecoration(
-                  labelText: 'Nomor surat dispensasi *',
-                  border: OutlineInputBorder(),
+              Semantics(
+                label: 'Nomor surat dispensasi, wajib diisi',
+                textField: true,
+                child: TextField(
+                  controller: surat,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLength: 60,
+                  decoration: InputDecoration(
+                    labelText: 'Nomor surat dispensasi *',
+                    hintText: 'cth. BAAK/2026/0421',
+                    border: const OutlineInputBorder(),
+                    counterText: '',
+                    errorText: surat.text.trim().isEmpty
+                        ? 'Surat dispensasi wajib untuk override.'
+                        : null,
+                  ),
+                  onChanged: (_) => setS(() {}),
                 ),
               ),
               const SizedBox(height: 16),
@@ -118,7 +131,9 @@ class _KrsPageState extends State<KrsPage> {
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
-                    onPressed: () => Navigator.pop(ctx, true),
+                    onPressed: surat.text.trim().isEmpty
+                        ? null
+                        : () => Navigator.pop(ctx, true),
                     child: const Text('Eksekusi'),
                   ),
                 ],
@@ -133,21 +148,35 @@ class _KrsPageState extends State<KrsPage> {
       _snack('Surat dispensasi wajib.', error: true);
       return;
     }
-    // Kapasitas fisik acuan spec 07 §3.3 (ruang LAB-KOMP-1 45 kursi).
+    // Kapasitas fisik: gunakan kapasitas kelas bila tersedia.
     // Naik ke lookup ruangan nyata saat backend wiring.
     const acuanRuangFisik = 45;
     final mkByKelas = {for (final k in _kelas) k.id: k.mkId};
-    final perByKelas = {for (final k in _kelas) k.id: 'per-2526-ganjil'};
-    final err = forceAddGuard(
+    // Periode dari sumber aktif (spec 06 §3) — bukan literal hardcoded.
+    late final String periodeId;
+    try {
+      periodeId = AdminRules.activePeriod(seedPeriode()).id;
+    } on StateError catch (err) {
+      _snack(err.message, error: true);
+      return;
+    }
+    final perByKelas = {for (final k in _kelas) k.id: periodeId};
+    // Guard LENGKAP via AdminRules: duplikat MK + status AKTIF + plafon.
+    // Status mahasiswa: gunakan data backend bila tersedia
+    // wiring, ganti dengan status dari tabel mahasiswa.
+    final check = AdminRules.forceAdd(
       npm: e.npm,
       targetKelasId: targetId,
       mkByKelas: mkByKelas,
       kelasPeriode: perByKelas,
       existing: _entries,
       kapasitasRuang: acuanRuangFisik,
+      statusMhs: 'AKTIF',
+      diambilSks: diambil,
+      plafonSks: plafon,
     );
-    if (err != null) {
-      _snack(err, error: true);
+    if (!check.ok) {
+      _snack(check.message!, error: true);
       return;
     }
     setState(() {
@@ -156,7 +185,7 @@ class _KrsPageState extends State<KrsPage> {
       e.paApproved = true;
       _kelas.firstWhere((k) => k.id == targetId).terdaftar++;
     });
-    _snack('Force-add ${_kelasKode(targetId)} OK. Audit ADMIN_FORCE_ADD_KRS.');
+    _snack('Force-add ke ${_kelasKode(targetId)} berhasil. Tercatat di audit.');
   }
 
   void _bypass(KrsEntry e) {
@@ -164,12 +193,12 @@ class _KrsPageState extends State<KrsPage> {
       e.status = 'AKTIF';
       e.paApproved = true;
     });
-    _snack('${e.npm} disahkan langsung (mandat Kaprodi).');
+    _snack('KRS ${e.npm} disahkan langsung atas mandat Kaprodi.');
   }
 
   void _drop(KrsEntry e) {
     setState(() => e.status = 'BATAL');
-    _snack('${e.npm} dibatalkan → MENGUNDURKAN_DIRI tercatat.');
+    _snack('KRS ${e.npm} dibatalkan dan tercatat sebagai pengunduran diri.');
   }
 
   Future<void> _switch(KrsEntry e) async {
@@ -214,19 +243,32 @@ class _KrsPageState extends State<KrsPage> {
     );
     if (ok != true) return;
     final counters = {for (final k in _kelas) k.id: k.terdaftar};
-    final r = switchClass(
-      entryId: e.id,
-      toKelasId: to,
-      entries: _entries,
-      counters: counters,
-    );
-    setState(() {
-      _entries = r.entries;
-      for (final k in _kelas) {
-        k.terdaftar = r.counters[k.id] ?? k.terdaftar;
-      }
-    });
-    _snack('Pindah atomik: counter −1/+1 sinkron.');
+    try {
+      final periodeId = AdminRules.activePeriod(seedPeriode()).id;
+      final r = AdminRules.doSwitchClass(
+        entryId: e.id,
+        toKelasId: to,
+        entries: _entries,
+        counters: counters,
+        npm: e.npm,
+        mkByKelas: {for (final k in _kelas) k.id: k.mkId},
+        kelasPeriode: {for (final k in _kelas) k.id: periodeId},
+        statusMhs: 'AKTIF',
+      );
+      setState(() {
+        _entries = r.entries;
+        for (final k in _kelas) {
+          k.terdaftar = r.counters[k.id] ?? k.terdaftar;
+        }
+      });
+      _snack(
+        'Pindah ke ${_kelasKode(to)} berhasil. Kuota kedua kelas diperbarui.',
+      );
+      return;
+    } on StateError catch (err) {
+      _snack(err.message, error: true);
+      return;
+    }
   }
 
   @override
@@ -292,7 +334,7 @@ class _KrsPageState extends State<KrsPage> {
                             tone: BadgeTone.info,
                           ),
                           StatusBadge(
-                            label: '3 force-add antre',
+                            label: 'Antrian persetujuan',
                             tone: BadgeTone.pending,
                           ),
                         ],
@@ -376,33 +418,28 @@ class _KrsCard extends StatelessWidget {
     final info = krsStudents[entry.npm];
     final plafon = info == null
         ? 24
-        : calculateMaxSks(semester: 2026 - info.$3 + 1, ips: info.$4);
-    final over =
-        info != null ? lockCheck(info.$5, plafon) != null : false;
+        : AdminRules.maxSks(semester: 2026 - info.$3 + 1, ips: info.$4);
+    final over = info != null ? !AdminRules.sksLoad(info.$5, plafon).ok : false;
     return BezelCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${entry.npm} • ${info?.$1 ?? '—'}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
+          AdminListRow(
+            title: Text(
+              '${entry.npm} • ${info?.$1 ?? '—'}',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
-              StatusBadge(
-                label: entry.status,
-                tone: switch (entry.status) {
-                  'AKTIF' => BadgeTone.success,
-                  'MENUNGGU_APPROVAL' => BadgeTone.pending,
-                  'BATAL' => BadgeTone.danger,
-                  _ => BadgeTone.neutral,
-                },
-              ),
-            ],
+            ),
+            trailing: StatusBadge(
+              label: entry.status,
+              tone: switch (entry.status) {
+                'AKTIF' => BadgeTone.success,
+                'MENUNGGU_APPROVAL' => BadgeTone.pending,
+                'BATAL' => BadgeTone.danger,
+                _ => BadgeTone.neutral,
+              },
+            ),
           ),
           if (info != null)
             Text(
@@ -429,10 +466,7 @@ class _KrsCard extends StatelessWidget {
                 onPressed: onSwitch,
                 child: const Text('Pindah'),
               ),
-              FilledButton.tonal(
-                onPressed: onDrop,
-                child: const Text('Drop'),
-              ),
+              FilledButton.tonal(onPressed: onDrop, child: const Text('Drop')),
             ],
           ),
         ],

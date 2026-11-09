@@ -1,3 +1,5 @@
+import '../rules/admin_thresholds.dart';
+
 /// Logika KRS admin (spec 07): plafon IPS, force-add, switch, jendela.
 class KrsEntry {
   final String id;
@@ -38,13 +40,14 @@ class KrsWindow {
 }
 
 /// Plafon 07 §4.1: maba (smt ≤ 2 / ips null) paket 20.
+/// Ambang dari [AdminThresholds] — ubah kebijakan di satu tempat.
 int calculateMaxSks({required int semester, required double? ips}) {
-  if (semester <= 2 || ips == null) return 20;
-  if (ips >= 3.00) return 24;
-  if (ips >= 2.50) return 21;
-  if (ips >= 2.00) return 18;
-  if (ips >= 1.50) return 15;
-  return 12;
+  if (semester <= 2 || ips == null) return AdminThresholds.sksMabaPaket;
+  if (ips >= AdminThresholds.ipsCumlaude) return AdminThresholds.plafonCumlaude;
+  if (ips >= AdminThresholds.ipsBaik) return AdminThresholds.plafonBaik;
+  if (ips >= AdminThresholds.ipsCukup) return AdminThresholds.plafonCukup;
+  if (ips >= AdminThresholds.ipsKurang) return AdminThresholds.plafonKurang;
+  return AdminThresholds.plafonMin;
 }
 
 String? lockCheck(int diambil, int plafon) {

@@ -70,11 +70,17 @@ Dart (Isolate untuk mobile & desktop, server Dart untuk web development)
 
 Alasan memilih Dart dibanding Go/Rust/Node.js sebagai bahasa backend:
 
+Realistisnya begini: ini proyek mahasiswa, dikerjakan solo atau tim kecil, dengan laptop biasa, waktu terbatas, dan target nyata — sidang, demo hidup, bukan paper benchmark. Setiap boundary bahasa baru (FFI ke Go/Rust, bundling .so per ABI, debugging dua stack trace) adalah satu malam begadang tambahan, satu titik gagal baru saat demo di depan dosen. Dart menghapus semua itu: satu bahasa dari tombol "Simpan KRS" sampai validasi SKS di business layer, satu `flutter run`, satu stack trace yang bisa dibaca manusia panik jam 2 pagi.
+
+Dramatisnya: Go dan Rust itu pedang besar — tajam, berat, gagah. Tapi SIAKAD bukan perang komputasi. Musuh utama di sini bukan CPU, melainkan latency jaringan ke Supabase, Wi-Fi kampus yang putus-nyambung, dan waktu. Membawa Rust untuk validasi KRS 24 SKS itu seperti membawa tank untuk antar surat — menang gaya, kalah bensin, mogok di tengah jalan FFI.
+
+Filosofisnya: alat harus melayani tujuan, bukan sebaliknya. Prinsip proyek ini adalah kesederhanaan yang disiplin — *satu bahasa, satu jiwa*. Pemisahan business logic dari UI tetap dijaga (lewat package `sia_backend_core` + Isolate), tapi tanpa mendirikan tembok bahasa di tengah rumah sendiri. Kecepatan mentah boleh kalah di atas kertas; yang menang adalah yang selesai, bisa dipresentasikan, dan bisa dijelaskan setiap barisnya tanpa berbohong.
+
 - Satu bahasa untuk seluruh stack — tidak butuh FFI, native binding, atau cross-compilation per platform
-- Beban kerja SIA bersifat I/O-bound (query, validasi, panggil Supabase), bukan CPU-bound — perbedaan performa mentah antar bahasa tidak terasa secara praktis pada skala proyek ini
-- Waktu development jauh lebih singkat dan risiko kegagalan teknis jauh lebih rendah dibanding pendekatan native embedded (Go/Rust)
-- Stack trace dan debugging konsisten satu bahasa dari UI sampai business logic
-- Tetap mendapat pemisahan business logic dari UI tanpa kompleksitas boundary bahasa
+- Beban kerja SIA bersifat I/O-bound (query, validasi, panggil Supabase), bukan CPU-bound — 90% waktu tunggu adalah menunggu jaringan, bukan mengeksekusi kode. Selisih nanosecond antar bahasa tenggelam dalam 200ms latency internet
+- Waktu development jauh lebih singkat dan risiko kegagalan teknis jauh lebih rendah dibanding pendekatan native embedded (Go/Rust) — satu bug FFI saat H-1 sidang bisa membunuh seluruh proyek
+- Stack trace dan debugging konsisten satu bahasa dari UI sampai business logic — penderitaan terpusat, mudah dilacak
+- Tetap mendapat pemisahan business logic dari UI tanpa kompleksitas boundary bahasa — kemurnian arsitektur tanpa pajak kompleksitas
 
 Database
 
@@ -242,6 +248,12 @@ Database utama: PostgreSQL, hosted menggunakan Supabase.
 
 Alasan:
 
+Realistisnya: tidak ada tim DevOps, tidak ada VPS, tidak ada budget server. Yang ada cuma laptop, koneksi internet, dan kebutuhan database yang bisa diakses HP A, HP B, dan laptop dosen penguji secara bersamaan. Self-host PostgreSQL di laptop berarti laptop harus menyala, IP harus reachable, firewall kampus harus bersahabat — tiga hal yang tidak pernah bersahabat saat demo. Supabase memutus rantai penderitaan itu: PostgreSQL sungguhan, ada dashboard, ada Auth, ada RLS, free tier cukup untuk demo 10 user + data dummy.
+
+Dramatisnya: data akademik itu nyawa kampus — KRS hilang berarti semester hilang, nilai bocor berarti kepercayaan runtuh. Menyimpan password database di dalam APK sama dengan menaruh kunci brankas di bawah keset. Supabase + RLS memindahkan benteng ke sisi server: walaupun APK dibedah, walaupun request dimanipulasi, database tetap bertanya "kamu siapa, boleh apa?" sebelum menjawab.
+
+Filosofisnya: jangan mengurus apa yang bukan inti persoalanmu. Tugas proyek ini adalah membuktikan alur akademik yang benar — bukan menjadi tukang server. Memakai layanan terkelola bukan kemalasan, melainkan kejujuran intelektual: fokus pada domain (mahasiswa, KRS, nilai), serahkan pengulangan (backup, patching, connection pooling) pada yang ahlinya.
+
 - PostgreSQL relational sangat cocok untuk SIA dengan banyak relasi antar entitas
 - Free tier cukup untuk data development/demo berskala kecil
 - Dashboard database memudahkan development
@@ -265,7 +277,13 @@ Storage database bukan perhatian utama. Yang lebih penting: free-tier compute li
 
 9. Mengapa PostgreSQL
 
-SIA memiliki struktur data yang sangat relational.
+SIA memiliki struktur data yang sangat relational — dan relasi di sini bukan hiasan ERD, melainkan hukum akademik yang hidup.
+
+Realistisnya: satu mahasiswa punya banyak KRS, satu KRS menunjuk satu kelas, satu kelas menunjuk satu mata kuliah, satu mata kuliah menunjuk satu kurikulum. Kalau satu rantai putus (mahasiswa dihapus tapi nilainya nyangkut, mata kuliah dihapus tapi KRS masih menunjuk ke kuburan), demo berubah jadi sidang pembelaan. PostgreSQL menjaga rantai itu dengan foreign key, transaction, dan constraint — database yang menolak berbohong, bukan database yang pasrah.
+
+Dramatisnya: SQLite per device itu kiamat kecil — HP A punya kebenaran versi A, HP B punya kebenaran versi B, tidak ada kebenaran kampus. PostgreSQL terpusat adalah satu kitab kebenaran: semua HP, semua laptop, membaca dan menulis ke sumber yang sama. Konflik diselesaikan transaksi, bukan adu mulut.
+
+Filosofisnya: kampus berjalan di atas kepercayaan terhadap catatan. Nilai, SKS, IPK — semua adalah memori institusi. Memori yang rapuh menghasilkan ijazah yang rapuh. Memilih database yang menjamin konsistensi (ACID, constraint, audit log) adalah memilih untuk menghormati masa depan mahasiswa yang datanya kita simpan.
 
 Program Studi
 │
@@ -308,7 +326,9 @@ Waktu development (solo/tim kecil) | Tercepat | Sedang | Paling lambat | Sedang
 Risiko kegagalan teknis (FFI/WASM) | Rendah | Sedang | Tinggi | Rendah (tapi jarang dipakai mobile)
 Kemudahan debug lintas layer | Mudah | Sulit | Sulit | Mudah
 
-Kesimpulan: untuk skala SIA sebagai proyek mahasiswa dengan beban kerja I/O-bound, selisih performa mentah antar bahasa backend tidak terasa di real-world usage. Bottleneck utama tetap berada pada latency jaringan ke Supabase, bukan kecepatan eksekusi bahasa. Dart dipilih karena menghilangkan kompleksitas FFI/cross-compilation sambil tetap mempertahankan pemisahan business logic dari UI.
+Kesimpulan: untuk skala SIA sebagai proyek mahasiswa dengan beban kerja I/O-bound, selisih performa mentah antar bahasa backend tidak terasa di real-world usage. Bottleneck utama tetap berada pada latency jaringan ke Supabase, bukan kecepatan eksekusi bahasa. Dart dipilih karena menghilangkan kompleksitas FFI/cross-compilation sambil tetap mempertahankan pemisahan business logic dari UI. Ini bukan anti-performa — ini prioritas yang jujur: proyek yang selesai dan aman didemo mengalahkan proyek yang nhanh di benchmark tapi mati di sidang.
+
+Rust/Go akan lebih unggul hanya jika muncul kebutuhan komputasi berat di lokal (enkripsi kompleks, constraint solving untuk generate jadwal otomatis, pemrosesan data besar) — belum menjadi kebutuhan pada cakupan SIA saat ini. Ketika hari itu tiba, arsitektur modular (package `sia_backend_core` terpisah) memungkinkan modul berat itu diganti tanpa meruntuhkan seluruh rumah.
 
 Rust/Go akan lebih unggul hanya jika muncul kebutuhan komputasi berat di lokal (enkripsi kompleks, constraint solving untuk generate jadwal otomatis, pemrosesan data besar) — belum menjadi kebutuhan pada cakupan SIA saat ini.
 

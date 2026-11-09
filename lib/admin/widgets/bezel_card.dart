@@ -9,12 +9,16 @@ class BezelCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
+  final String? semanticLabel;
+  final String? onTapHint;
 
   const BezelCard({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.onTap,
+    this.semanticLabel,
+    this.onTapHint,
   });
 
   @override
@@ -43,17 +47,17 @@ class BezelCard extends StatelessWidget {
               ? const LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0xFF12203A), Color(0xFF0E172B)],
+                  colors: [AppColors.darkBezelTop, AppColors.darkSurface],
                 )
               : const LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.white, Color(0xFFF8FAFC)],
+                  colors: [AppColors.lightSurface, AppColors.lightBg],
                 ),
           boxShadow: [
             if (!dark)
               const BoxShadow(
-                color: Color(0x0A0F172A),
+                color: AppColors.bezelShadow,
                 blurRadius: 12,
                 offset: Offset(0, 4),
               ),
@@ -63,13 +67,19 @@ class BezelCard extends StatelessWidget {
       ),
     );
     if (onTap == null) return outer;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(32),
-      child: InkWell(
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      hint: onTapHint,
+      child: Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(32),
-        onTap: onTap,
-        child: outer,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(32),
+          onTap: onTap,
+          autofocus: false,
+          child: outer,
+        ),
       ),
     );
   }

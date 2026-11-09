@@ -1,3 +1,11 @@
+import '../rules/admin_thresholds.dart';
+
+/// Kode fakultas TI dalam NPM (FFF, spec 05 §4.1).
+///
+/// Dulu di `civitas_seed.dart` — file seed dipakai logika produksi,
+/// dan wizard PA menulis literal `'2610010'` sendiri. Satu sumber di sini.
+const facultyCodeTI = '100';
+
 /// Model + logika civitas (spec 05): NPM 10 digit, status machine, NIDN, BKD.
 class Mahasiswa {
   final String npm;
@@ -53,8 +61,8 @@ String generateNpm({
   if (!npmRe.hasMatch(npm)) {
     throw ArgumentError('NPM harus tepat 10 digit angka: $npm');
   }
-  if (nextSequence < 1 || nextSequence > 999) {
-    throw ArgumentError('Nomor urut 1–999.');
+  if (nextSequence < 1 || nextSequence > AdminThresholds.npmSeqMax) {
+    throw ArgumentError('Nomor urut 1–${AdminThresholds.npmSeqMax}.');
   }
   return npm;
 }
@@ -68,7 +76,9 @@ int nextSequenceFor(String prefix7, List<String> existingNpms) {
       if (seq > max) max = seq;
     }
   }
-  if (max >= 999) throw StateError('Kuota urut penuh (maks 999).');
+  if (max >= AdminThresholds.npmSeqMax) {
+    throw StateError('Kuota urut penuh (maks ${AdminThresholds.npmSeqMax}).');
+  }
   return max + 1;
 }
 
@@ -91,8 +101,12 @@ bool krsUnlocked(String status) => status == 'AKTIF';
 
 /// BKD 05 §3.4: ideal 12–16 SKS.
 String? bkdWarning(int beban) {
-  if (beban < 12) return 'Kurang beban (< 12 SKS).';
-  if (beban > 16) return 'Kelebihan beban (> 16 SKS).';
+  if (beban < AdminThresholds.bkdMin) {
+    return 'Kurang beban (< ${AdminThresholds.bkdMin} SKS).';
+  }
+  if (beban > AdminThresholds.bkdMax) {
+    return 'Kelebihan beban (> ${AdminThresholds.bkdMax} SKS).';
+  }
   return null;
 }
 
