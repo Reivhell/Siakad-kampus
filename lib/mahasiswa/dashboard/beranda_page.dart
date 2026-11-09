@@ -9,6 +9,7 @@ import '../../admin/widgets/section_header.dart';
 import '../../admin/widgets/status_badge.dart';
 import '../../app/formatters.dart';
 import '../../app/widgets/status_banner.dart';
+import '../../features/mahasiswa/models/mahasiswa_layanan_models.dart';
 import '../../features/mahasiswa/models/mahasiswa_models.dart';
 import '../../features/mahasiswa/providers/mahasiswa_providers.dart';
 import '../widgets/page_body.dart';
@@ -54,6 +55,9 @@ class BerandaPage extends ConsumerWidget {
     final tagihan = repo.tagihanPeriodeAktif(npm);
     final gate = repo.gate(npm);
     final pengumuman = repo.pengumuman.take(2).toList();
+    final belumDibaca = repo.jumlahPengumumanBelumDibaca;
+    final cekYudisium = repo.cekYudisium(npm);
+    final agenda = repo.eventBerikutnya();
 
     return PageBody(
       children: [
@@ -107,6 +111,18 @@ class BerandaPage extends ConsumerWidget {
             actionLabel: 'Bayar',
             onAction: () => context.go('/mahasiswa/keuangan'),
           ),
+        if (cekYudisium.semuaTercapai && cekYudisium.pengajuan == null)
+          StatusBanner(
+            tone: StatusBannerTone.success,
+            icon: Icons.celebration_outlined,
+            message:
+                'Selamat! Seluruh syarat kelulusan terpenuhi '
+                '(${cekYudisium.sksLulus}/${cekYudisium.sksTarget} SKS). '
+                'Ajukan yudisium sekarang.',
+            actionLabel: 'Yudisium',
+            onAction: () => context.go('/mahasiswa/yudisium'),
+          ),
+        if (agenda != null) _AgendaCard(event: agenda),
         SectionHeader(
           eyebrow: 'Jadwal',
           title: 'Hari ini',
@@ -159,8 +175,16 @@ class BerandaPage extends ConsumerWidget {
           ),
         ),
         SectionHeader(
+          eyebrow: 'Pintasan',
+          title: 'Layanan mahasiswa',
+          subtitle: 'Akses cepat modul akademik pendukung.',
+        ),
+        const _QuickActions(),
+        SectionHeader(
           eyebrow: 'Akademik',
-          title: 'Info akademik',
+          title: belumDibaca == 0
+              ? 'Info akademik'
+              : 'Info akademik · $belumDibaca baru',
           action: TextButton(
             onPressed: () => context.go('/mahasiswa/info'),
             child: const Text('Semua info'),
@@ -168,6 +192,132 @@ class BerandaPage extends ConsumerWidget {
         ),
         for (final p in pengumuman) _PengumumanTile(pengumuman: p),
       ],
+    );
+  }
+}
+
+class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+
+  @override
+  Widget build(BuildContext context) {
+    return BezelCard(
+      padding: const EdgeInsets.all(12),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: const [
+          _Aksi(
+            icon: Icons.workspace_premium_outlined,
+            label: 'Transkrip',
+            path: '/mahasiswa/transkrip',
+          ),
+          _Aksi(
+            icon: Icons.forum_outlined,
+            label: 'Bimbingan',
+            path: '/mahasiswa/bimbingan',
+          ),
+          _Aksi(
+            icon: Icons.description_outlined,
+            label: 'Surat Akademik',
+            path: '/mahasiswa/surat',
+          ),
+          _Aksi(
+            icon: Icons.celebration_outlined,
+            label: 'Yudisium',
+            path: '/mahasiswa/yudisium',
+          ),
+          _Aksi(
+            icon: Icons.dynamic_feed_outlined,
+            label: 'Pengajuan',
+            path: '/mahasiswa/pengajuan',
+          ),
+          _Aksi(
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Keuangan',
+            path: '/mahasiswa/keuangan',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Aksi extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String path;
+
+  const _Aksi({required this.icon, required this.label, required this.path});
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      avatar: Icon(icon, size: 18),
+      label: Text(label),
+      onPressed: () => context.go(path),
+    );
+  }
+}
+
+class _AgendaCard extends StatelessWidget {
+  final KalenderEvent event;
+
+  const _AgendaCard({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final sisa = event.sisaHari(DateTime.now());
+    return BezelCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '$sisa',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text('hari', style: Theme.of(context).textTheme.labelSmall),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  event.judul,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                Text(
+                  formatTanggalPanjang(event.tanggal),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.go('/mahasiswa/info'),
+            child: const Text('Kalender'),
+          ),
+        ],
+      ),
     );
   }
 }

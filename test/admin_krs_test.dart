@@ -51,7 +51,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('gate blokir'), findsNWidgets(2));
-    expect(find.textContaining('gate lolos'), findsOneWidget);
+    expect(find.textContaining('gate lolos'), findsNWidgets(2));
 
     final tombol = find.widgetWithText(TextButton, 'Tandai lunas').first;
     await tester.ensureVisible(tombol);
@@ -59,6 +59,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('gate blokir'), findsOneWidget);
-    expect(find.textContaining('gate lolos'), findsNWidgets(2));
+    expect(find.textContaining('gate lolos'), findsNWidgets(3));
   });
 }

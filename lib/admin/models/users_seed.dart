@@ -58,6 +58,14 @@ List<AppUser> seedUsers() => [
     hasRelations: true,
     lastLogin: '5 mnt lalu',
   ),
+  AppUser(
+    id: 'u-mhs-4',
+    nama: 'Ayu Lestari',
+    email: 'ayu.221001@mhs.kampus.ac.id',
+    roles: {UserRole.mahasiswa},
+    hasRelations: true,
+    lastLogin: '1 hari lalu',
+  ),
 ];
 
 const currentAdminId = 'u-admin-1';

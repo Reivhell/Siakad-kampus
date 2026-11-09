@@ -45,13 +45,12 @@ class AuthRepository {
     final users = seedUsers();
     return AuthRepository(
       users: users,
-      passwordByUserId: {
-        for (final u in users) u.id: _passwordForRole(u),
-      },
+      passwordByUserId: {for (final u in users) u.id: _passwordForRole(u)},
       npmByUserId: const {
         'u-mhs-1': '2410010015',
         'u-mhs-2': '2510010002',
         'u-mhs-3': '2410010016',
+        'u-mhs-4': '2210010001',
       },
     );
   }
@@ -91,9 +90,7 @@ class AuthRepository {
       );
     }
     if (user.status == AccountStatus.nonaktif) {
-      return const AuthResult.fail(
-        'Akun nonaktif. Hubungi administrator.',
-      );
+      return const AuthResult.fail('Akun nonaktif. Hubungi administrator.');
     }
     if (passwordByUserId[user.id] != password) {
       return const AuthResult.fail('Password salah.');
@@ -101,13 +98,9 @@ class AuthRepository {
     if (user.roles.contains(UserRole.dosen) &&
         !user.roles.contains(UserRole.admin) &&
         !user.roles.contains(UserRole.mahasiswa)) {
-      return const AuthResult.fail(
-        'Portal dosen belum tersedia pada MVP ini.',
-      );
+      return const AuthResult.fail('Portal dosen belum tersedia pada MVP ini.');
     }
-    return AuthResult.ok(
-      AuthAccount(user: user, npm: npmByUserId[user.id]),
-    );
+    return AuthResult.ok(AuthAccount(user: user, npm: npmByUserId[user.id]));
   }
 }
 
