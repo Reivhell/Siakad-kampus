@@ -84,6 +84,16 @@ Catatan koreksi terhadap spek lama:
 | Yudisium 144 SKS/IPK≥2.0 (`11`) | modul admin 12 | EKSTENSI P2 |
 | Layanan pengajuan: cuti, banding nilai, konversi/MBKM (`12`) | modul admin 08/12/14 (sisi admin); §12 Rencana tidak mengatur sisi mahasiswa | EKSTENSI P2, butuh migration baru (§8) |
 
+### 3c. Turunan & Penegakan Aturan (memperkaya §3a, bukan kapabilitas baru)
+
+| No | Modul | Memperkaya | Skema | File spek |
+|:--:|:---|:---|:---|:---|
+| 13 | Kalkulator Target IPK | "melihat nilai" (§12) | Tanpa tabel | `13_kalkulator_ipk.md` |
+| 14 | Rekomendasi Kelas | "mengambil KRS sesuai periode" (§12) | Tanpa tabel | `14_rekomendasi_kelas.md` |
+| 15 | Prasyarat Mata Kuliah | Validasi `03` | **Migration `022`** (`mata_kuliah_prasyarat`) | `15_prasyarat_mata_kuliah.md` |
+
+> Ketiganya tidak menambah kemampuan role di luar §12: `13` hanya menghitung ulang data nilai sendiri, `14` hanya menyusun ulang katalog, `15` hanya menolak KRS yang tidak sah. Prioritas implementasi: setelah P0 §3a stabil.
+
 ---
 
 ## 4. Routing Final (selaras §19 + ARCHITECTURE)
@@ -98,6 +108,10 @@ Kanonis (wajib):
 /mahasiswa/nilai                          (§19)
 /mahasiswa/presensi                       (ARCHITECTURE pelengkap §12)
 /mahasiswa/profil                         (ARCHITECTURE pelengkap §12)
+
+Turunan (tetap di dalam route kanonis, bukan route baru):
+/mahasiswa/nilai/simulasi-ipk             (spek `13`, panel dalam Nilai)
+/mahasiswa/krs/rekomendasi                (spek `14`, panel dalam KRS)
 ```
 
 EKSTENSI (dilarang diklaim sebagai kontrak Rencana; implementasi hanya setelah P0):

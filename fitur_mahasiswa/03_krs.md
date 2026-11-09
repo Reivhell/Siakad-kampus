@@ -10,7 +10,9 @@
 
 Plafon SKS dari IPS lalu: >=3.00→24, >=2.50→21, >=2.00→18, >=1.50→15, <1.50→12, smt 1-2 paket 20.
 
-Tolak jika: kelas penuh (`jumlah_terdaftar >= kapasitas`), bentrok `jadwal_kelas`, duplikat MK sama, over SKS, status bukan AKTIF.
+Tolak jika: kelas penuh (`jumlah_terdaftar >= kapasitas`), bentrok `jadwal_kelas`, duplikat MK sama, over SKS, status bukan AKTIF, atau **prasyarat belum terpenuhi** (`15_prasyarat_mata_kuliah.md`).
+
+Panel rekomendasi MK mengikuti `14_rekomendasi_kelas.md`; rekomendasi tidak mendaftarkan otomatis.
 
 ```dart
 int maxSks({required int semester, required double? ipsLalu}) {

@@ -21,3 +21,4 @@ ORDER BY mk.kode;
 ## Edge Cases
 
 - Nilai belum diinput → strip `-`, jangan hitung IPS. Mengulang → tampilkan riwayat, tandai lulus.
+- Panel simulasi target IPK: lihat `13_kalkulator_ipk.md` (baca-saja, tanpa tabel baru).
