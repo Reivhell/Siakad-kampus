@@ -15,6 +15,7 @@ const _migrations = <String>[
   'database/migrations/024_rls_hardening.sql',
   'database/migrations/025_function_search_path.sql',
   'database/migrations/026_audit_chain_extensions.sql',
+  'database/migrations/027_prasyarat_cycle_guard.sql',
 ];
 
 const _versions = <String>[
@@ -29,6 +30,7 @@ const _versions = <String>[
   '024_rls_hardening',
   '025_function_search_path',
   '026_audit_chain_extensions',
+  '027_prasyarat_cycle_guard',
 ];
 
 Future<void> main(List<String> argv) async {
