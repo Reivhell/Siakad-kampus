@@ -411,7 +411,7 @@ GRANT EXECUTE ON FUNCTION public.fn_verify_letter(uuid) TO anon, authenticated;
 -- Audit chain: append-only + hash of previous row.
 CREATE OR REPLACE FUNCTION public.fn_audit_chain()
 RETURNS trigger
-LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+LANGUAGE plpgsql SET search_path = public, extensions, pg_temp AS $$
 DECLARE
     v_prev text;
 BEGIN

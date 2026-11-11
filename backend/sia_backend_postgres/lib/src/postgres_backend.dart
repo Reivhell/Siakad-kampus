@@ -13,7 +13,8 @@ class PostgresBackend
         AuditRepository {
   PostgresBackend(String url, {int maxConnections = 10}) {
     final uri = Uri.parse(url);
-    final userInfo = uri.userInfo.split(':');
+    // Password di URL biasanya percent-encoded (mis. %40 untuk @).
+    final userInfo = uri.userInfo.split(':').map(Uri.decodeComponent).toList();
     final isLocal = uri.host == '127.0.0.1' || uri.host == 'localhost';
     final ssl = switch (uri.queryParameters['sslmode']) {
       'disable' => SslMode.disable,

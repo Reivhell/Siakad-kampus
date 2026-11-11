@@ -13,6 +13,8 @@ const _migrations = <String>[
   'database/migrations/022_rls.sql',
   'database/migrations/023_hardening.sql',
   'database/migrations/024_rls_hardening.sql',
+  'database/migrations/025_function_search_path.sql',
+  'database/migrations/026_audit_chain_extensions.sql',
 ];
 
 const _versions = <String>[
@@ -25,12 +27,16 @@ const _versions = <String>[
   '022_rls',
   '023_hardening',
   '024_rls_hardening',
+  '025_function_search_path',
+  '026_audit_chain_extensions',
 ];
 
 Future<void> main(List<String> argv) async {
   final parser = ArgParser()
     ..addOption('env', abbr: 'e', defaultsTo: 'local', allowed: ['local', 'supabase'])
-    ..addOption('url', help: 'PostgreSQL URL. Defaults to DATABASE_URL or local.')
+    ..addOption('url',
+        help: 'PostgreSQL URL. Default: SUPABASE_DB_URL untuk env supabase, '
+            'selain itu DATABASE_URL / lokal.')
     ..addFlag('help', abbr: 'h', negatable: false);
 
   final args = parser.parse(argv);
@@ -42,8 +48,14 @@ Future<void> main(List<String> argv) async {
 
   final env = args['env'] as String;
   final url = (args['url'] as String?) ??
-      Platform.environment['DATABASE_URL'] ??
-      'postgresql://postgres@127.0.0.1:5432/siakad';
+      Platform.environment[env == 'supabase' ? 'SUPABASE_DB_URL' : 'DATABASE_URL'] ??
+      (env == 'local' ? 'postgresql://postgres@127.0.0.1:5432/siakad' : null);
+  if (url == null || url.isEmpty) {
+    stderr.writeln('Set SUPABASE_DB_URL atau --url untuk env supabase.');
+    exitCode = 64;
+    return;
+  }
+
 
   try {
     switch (args.rest.first) {
@@ -68,7 +80,17 @@ Future<void> main(List<String> argv) async {
   }
 }
 
+bool _isLocalHost(String url) {
+  final host = Uri.parse(url).host;
+  return host == 'localhost' || host == '127.0.0.1' || host == '::1';
+}
+
 Future<void> _migrate(String url, String env, {required bool adopt}) async {
+  // Stub auth lokal tidak boleh menyentuh database remote (pernah terjadi:
+  // local_000_supabase_stub ikut diterapkan ke project Supabase).
+  if (env == 'local' && !_isLocalHost(url)) {
+    throw Exception('Tolak --env local untuk host non-lokal: ${Uri.parse(url).host}');
+  }
   await _psql(url, ['-c', '''
     CREATE TABLE IF NOT EXISTS public.schema_migrations (
       version text PRIMARY KEY,
@@ -98,6 +120,9 @@ Future<void> _migrate(String url, String env, {required bool adopt}) async {
 }
 
 Future<void> _seed(String url, String env) async {
+  if (env == 'local' && !_isLocalHost(url)) {
+    throw Exception('Tolak --env local untuk host non-lokal: ${Uri.parse(url).host}');
+  }
   await _psql(url, ['-v', 'ON_ERROR_STOP=1', '-f', 'database/seed/001_reference.sql']);
   if (env == 'local') {
     await _psql(url, ['-v', 'ON_ERROR_STOP=1', '-f', 'database/local/002_dev_seed.sql']);
@@ -151,7 +176,8 @@ Future<void> _verify(String url) async {
 
 Future<List<List<Object?>>> _query(String url, String sql) async {
   final uri = Uri.parse(url);
-  final userInfo = uri.userInfo.split(':');
+  // Password di URL biasanya percent-encoded (mis. %40 untuk @).
+  final userInfo = uri.userInfo.split(':').map(Uri.decodeComponent).toList();
   final endpoint = Endpoint(
     host: uri.host,
     port: uri.hasPort ? uri.port : 5432,
