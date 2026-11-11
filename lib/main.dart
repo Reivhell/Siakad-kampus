@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/theme/siakad_theme.dart';
 import 'shared/api_client.dart';
@@ -11,7 +12,7 @@ void main() async {
   final apiClient = ApiClient(baseUrl: 'http://127.0.0.1:8080');
   final auth = AuthService(apiClient: apiClient);
   await auth.init();
-  runApp(SiakadApp(apiClient: apiClient, auth: auth));
+  runApp(ProviderScope(child: SiakadApp(apiClient: apiClient, auth: auth)));
 }
 
 class SiakadApp extends StatelessWidget {

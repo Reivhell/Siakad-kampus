@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../admin/admin_shell.dart';
+import '../../mahasiswa/mahasiswa_router.dart';
 import '../../shared/api_client.dart';
 import '../../shared/app_session.dart';
 import '../../shared/auth_service.dart';
@@ -78,12 +79,10 @@ class _RoleGateState extends State<RoleGate> {
           onLogout: _logout,
         );
       case AppRole.mahasiswa:
-        return _RolePlaceholder(
-          title: 'Dasbor Mahasiswa',
-          subtitle: 'KRS, jadwal, dan nilai menyusul di modul mahasiswa.',
-          userLabel: session.npm,
-          onLogout: _logout,
-        );
+        final npm = session.user['npm'] is String
+            ? session.user['npm'] as String
+            : session.npm;
+        return MahasiswaRouter(npm: npm, onLogout: _logout);
     }
   }
 }
