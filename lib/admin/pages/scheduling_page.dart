@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/admin_page.dart';
+
 import '../models/civitas.dart';
 import '../models/civitas_seed.dart';
 import '../models/curriculum.dart';
@@ -8,6 +10,7 @@ import '../models/master_data.dart';
 import '../models/master_seed.dart';
 import '../models/scheduling.dart';
 import '../models/scheduling_seed.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/admin_dialog.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/empty_state.dart';
@@ -42,17 +45,15 @@ class _SchedulingPageState extends State<SchedulingPage> {
     _mk = seedMk();
   }
 
-  String _mkNama(String id) => _mk
-      .where((m) => m.id == id)
-      .map((m) => m.nama)
-      .join()
-      .ifEmpty('—');
+  String _mkNama(String id) =>
+      _mk.where((m) => m.id == id).map((m) => m.nama).join().ifEmpty('—');
   int _mkSks(String id) {
     for (final m in _mk) {
       if (m.id == id) return m.sks;
     }
     return 3;
   }
+
   String _ruangKode(String id) =>
       _ruang.where((r) => r.id == id).map((r) => r.kode).join().ifEmpty('—');
   String _dosenNama(String nidn) => _dosen
@@ -62,13 +63,7 @@ class _SchedulingPageState extends State<SchedulingPage> {
       .ifEmpty('—');
 
   void _snack(String m, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(m),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-      ),
-    );
+    showAdminSnack(context, m, error: error);
   }
 
   Future<void> _openKelasForm() async {
@@ -78,8 +73,9 @@ class _SchedulingPageState extends State<SchedulingPage> {
       child: _KelasForm(mk: _mk),
     );
     if (res == null) return;
-    if (res.kapasitas <= 0) {
-      _snack('Kapasitas harus > 0.', error: true);
+    final kapCheck = AdminRules.positiveCapacity(res.kapasitas);
+    if (!kapCheck.ok) {
+      _snack(kapCheck.message!, error: true);
       return;
     }
     final mk = _mk.firstWhere((x) => x.id == res.mkId);
@@ -127,22 +123,36 @@ class _SchedulingPageState extends State<SchedulingPage> {
             selesai: selesai,
           );
           final ruang = _ruang.firstWhere((r) => r.id == ruangId);
-          final roomHit = roomConflict(cand, _jadwal);
-          final lecHit = lecturerConflict(
-            cand,
-            k.dosenIds,
-            dosenByKelas(_kelas),
-            _jadwal,
+          // Pesan per-baris dari satu evaluasi fasade (06 §4).
+          // Dulu 4 panggilan model manual di sini + 1 via fasade.
+          final hits = AdminRules.scheduleHits(
+            candidate: cand,
+            existing: _jadwal,
+            candidateDosen: k.dosenIds,
+            dosenByKelas: dosenByKelas(_kelas),
+            sks: _mkSks(k.mkId),
+            kapasitasKelas: k.kapasitas,
+            kapasitasRuang: ruang.kapasitas,
           );
-          final capErr = capacityCheck(k.kapasitas, ruang.kapasitas);
-          final durErr = durationCheck(_mkSks(k.mkId), mulai, selesai);
-          final blackout = isBlackoutWarning(hari, mulai, selesai);
-          final clear =
-              roomHit == null && lecHit == null && capErr == null && durErr == null;
-          String? hitKode(JadwalSlot s) => _kelas
-              .where((x) => x.id == s.kelasId)
-              .map((x) => x.kode)
-              .join();
+          final roomHit = hits.room;
+          final lecHit = hits.lecturer;
+          final capErr = hits.capacity;
+          final durErr = hits.duration;
+          final blackout = AdminRules.scheduleBlackout(hari, mulai, selesai);
+          // Keputusan via fasade (termasuk guard renovasi). Konsisten
+          // by-construction: scheduleSlot mendelegasikan ke scheduleHits.
+          final clear = AdminRules.scheduleSlot(
+            candidate: cand,
+            existing: _jadwal,
+            candidateDosen: k.dosenIds,
+            dosenByKelas: dosenByKelas(_kelas),
+            sks: _mkSks(k.mkId),
+            kapasitasKelas: k.kapasitas,
+            kapasitasRuang: ruang.kapasitas,
+            ruangTersedia: ruang.tersedia,
+          ).ok;
+          String? hitKode(JadwalSlot s) =>
+              _kelas.where((x) => x.id == s.kelasId).map((x) => x.kode).join();
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,10 +226,7 @@ class _SchedulingPageState extends State<SchedulingPage> {
                 ok: capErr == null,
                 text: capErr ?? 'Muatan ${k.kapasitas}/${ruang.kapasitas} aman',
               ),
-              _Check(
-                ok: durErr == null,
-                text: durErr ?? 'Durasi memenuhi SKS',
-              ),
+              _Check(ok: durErr == null, text: durErr ?? 'Durasi memenuhi SKS'),
               if (blackout)
                 const _Check(
                   ok: true,
@@ -276,13 +283,13 @@ class _SchedulingPageState extends State<SchedulingPage> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final slots = _jadwal
-        .where((j) => _hariFilter == 0 || j.hari == _hariFilter)
-        .toList()
-      ..sort((a, b) =>
-          a.hari != b.hari
-              ? a.hari.compareTo(b.hari)
-              : a.mulai.compareTo(b.mulai));
+    final slots =
+        _jadwal.where((j) => _hariFilter == 0 || j.hari == _hariFilter).toList()
+          ..sort(
+            (a, b) => a.hari != b.hari
+                ? a.hari.compareTo(b.hari)
+                : a.mulai.compareTo(b.mulai),
+          );
 
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(
@@ -367,44 +374,56 @@ class _SchedulingPageState extends State<SchedulingPage> {
                 child: SectionHeader(
                   eyebrow: 'Rombel',
                   title: 'Daftar Kelas',
-                  subtitle: 'Ketuk jadwal untuk alokasi slot + cek bentrok live',
+                  subtitle:
+                      'Ketuk jadwal untuk alokasi slot + cek bentrok live',
                 ),
               ),
               const SizedBox(height: 8),
               for (final k in _kelas)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Reveal(
-                    child: BezelCard(
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text('[${k.kode}] ${_mkNama(k.mkId)}'),
-                        subtitle: Text(
-                          k.dosenIds.isEmpty
-                              ? '${k.terdaftar}/${k.kapasitas} • BELUM ADA DOSEN'
-                              : '${k.terdaftar}/${k.kapasitas} • ${_dosenNama(k.leadDosenId)}${k.terdaftar >= k.kapasitas ? ' • PENUH' : ''}',
-                        ),
-                        trailing: Wrap(
-                          spacing: 4,
-                          children: [
-                            if (k.dosenIds.isEmpty)
-                              const StatusBadge(
-                                label: 'NO DOSEN',
-                                tone: BadgeTone.danger,
-                              )
-                            else if (k.terdaftar >= k.kapasitas)
-                              const StatusBadge(
-                                label: 'PENUH',
-                                tone: BadgeTone.pending,
-                              ),
-                            FilledButton.tonal(
-                              onPressed: () => _alokasiForm(k),
-                              child: const Text('Jadwal'),
+                  child: Builder(
+                    builder: (_) {
+                      // Prioritas badge via mesin kesehatan fasade (01 §3.3).
+                      // Dulu if/else manual duplikat definisi ClassHealth.
+                      final health = AdminRules.classHealth(
+                        terdaftar: k.terdaftar,
+                        kapasitas: k.kapasitas,
+                        hasDosen: k.dosenIds.isNotEmpty,
+                        hasRuang: _jadwal.any((j) => j.kelasId == k.id),
+                      );
+                      return Reveal(
+                        child: BezelCard(
+                          child: AdminListRow(
+                            title: Text('[${k.kode}] ${_mkNama(k.mkId)}'),
+                            subtitle: Text(
+                              health == ClassHealth.tanpaDosen
+                                  ? '${k.terdaftar}/${k.kapasitas} • BELUM ADA DOSEN'
+                                  : '${k.terdaftar}/${k.kapasitas} • ${_dosenNama(k.leadDosenId)}${health == ClassHealth.penuh ? ' • PENUH' : ''}',
                             ),
-                          ],
+                            trailing: Wrap(
+                              spacing: 4,
+                              children: [
+                                if (health == ClassHealth.tanpaDosen)
+                                  const StatusBadge(
+                                    label: 'NO DOSEN',
+                                    tone: BadgeTone.danger,
+                                  )
+                                else if (health == ClassHealth.penuh)
+                                  const StatusBadge(
+                                    label: 'PENUH',
+                                    tone: BadgeTone.pending,
+                                  ),
+                                FilledButton.tonal(
+                                  onPressed: () => _alokasiForm(k),
+                                  child: const Text('Jadwal'),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               const SizedBox(height: 80),
@@ -458,10 +477,7 @@ class _KelasFormState extends State<_KelasForm> {
           label: const Text('Mata Kuliah'),
           dropdownMenuEntries: [
             for (final m in widget.mk)
-              DropdownMenuEntry(
-                value: m.id,
-                label: '[${m.kode}] ${m.nama}',
-              ),
+              DropdownMenuEntry(value: m.id, label: '[${m.kode}] ${m.nama}'),
           ],
           onSelected: (v) => setState(() => _mkId = v ?? _mkId),
         ),
@@ -497,11 +513,7 @@ class _KelasFormState extends State<_KelasForm> {
             FilledButton(
               onPressed: () => Navigator.pop(
                 context,
-                _KelasDraft(
-                  _mkId,
-                  _paralel,
-                  int.tryParse(_kap.text) ?? 0,
-                ),
+                _KelasDraft(_mkId, _paralel, int.tryParse(_kap.text) ?? 0),
               ),
               child: const Text('Buka'),
             ),
@@ -559,9 +571,8 @@ class _SlotCard extends StatelessWidget {
             width: 64,
             padding: const EdgeInsets.symmetric(vertical: 8),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary
+                  .withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(

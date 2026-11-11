@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../models/advising.dart';
+import '../widgets/admin_page.dart';
+
+import '../models/civitas.dart';
 import '../models/fase5_seed.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/admin_dialog.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/feedback.dart';
@@ -27,20 +30,22 @@ class _AdvisorPageState extends State<AdvisorPage> {
   }
 
   void _snack(String m) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(m), behavior: SnackBarBehavior.floating),
-    );
+    showAdminSnack(context, m);
   }
 
   Future<void> _wizard() async {
+    // Generate NPM batch secara deterministik dari tahun/prodi/urut.
+    // Dulu prefix `'2610010'` ditulis literal — putus saat kode berubah.
+    const batch = 120;
+    const prefix = '26${facultyCodeTI}10';
     final picked = _loads.map((e) => e.nidn).toSet();
     final res = await showAdminForm<Map<String, List<String>>>(
       context: context,
-      title: 'Alokasi Batch 120 Maba',
+      title: 'Alokasi Batch $batch Maba',
       child: StatefulBuilder(
         builder: (ctx, setS) {
           final n = picked.length;
-          final each = n == 0 ? 0 : 120 ~/ n;
+          final each = n == 0 ? 0 : batch ~/ n;
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,15 +57,14 @@ class _AdvisorPageState extends State<AdvisorPage> {
                   subtitle: Text('Asuhan kini ${d.asuhan}'),
                   value: picked.contains(d.nidn),
                   onChanged: (v) => setS(
-                    () => v == true
-                        ? picked.add(d.nidn)
-                        : picked.remove(d.nidn),
+                    () =>
+                        v == true ? picked.add(d.nidn) : picked.remove(d.nidn),
                   ),
                 ),
               Text(
                 n < 2
                     ? 'Centang minimal 2 dosen.'
-                    : 'Simulasi: 120 → $n dosen @ $each mhs (round-robin NPM).',
+                    : 'Simulasi: $batch → $n dosen @ $each mhs (round-robin NPM).',
               ),
               const SizedBox(height: 16),
               Row(
@@ -76,11 +80,11 @@ class _AdvisorPageState extends State<AdvisorPage> {
                         ? null
                         : () => Navigator.pop(
                             ctx,
-                            distributeRoundRobin(
+                            AdminRules.distribute(
                               studentNpms: List.generate(
-                                120,
+                                batch,
                                 (i) =>
-                                    '2610010${(i + 1).toString().padLeft(3, '0')}',
+                                    '$prefix${(i + 1).toString().padLeft(3, '0')}',
                               ),
                               lecturerNidns: picked.toList(),
                             ),
@@ -100,7 +104,7 @@ class _AdvisorPageState extends State<AdvisorPage> {
         d.asuhan += res[d.nidn]?.length ?? 0;
       }
     });
-    _snack('120 maba teralokasikan atomik. Audit tercatat.');
+    _snack('$batch maba teralokasikan. Tercatat di audit.');
   }
 
   Future<void> _bypass(AdvisorLoad d) async {
@@ -139,17 +143,20 @@ class _AdvisorPageState extends State<AdvisorPage> {
       ),
     );
     if (ok != true) return;
-    final err = bypassEligible(
+    final bypass = AdminRules.bypass(
       deadlineHoursLeft: 12,
       remindersSent: 2,
       sksOk: true,
       noConflict: true,
       catatan: catatan.text,
     );
-    if (err != null) {
+    if (!bypass.ok) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(err), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text(bypass.message ?? 'Bypass ditolak.'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
       return;
@@ -176,7 +183,8 @@ class _AdvisorPageState extends State<AdvisorPage> {
                 child: SectionHeader(
                   eyebrow: 'Admin / Dosen Wali',
                   title: 'Dosen Wali & Bimbingan',
-                  subtitle: 'Kuota ideal 30–40 • overload > 45 merah',
+                  subtitle:
+                      'Kuota ideal 30–40 • overload > ${AdminThresholds.asuhanOverload} merah',
                   action: FilledButton.icon(
                     onPressed: _wizard,
                     icon: const Icon(Icons.casino_outlined, size: 18),
@@ -194,29 +202,23 @@ class _AdvisorPageState extends State<AdvisorPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '${_loads[i].nama} (${_loads[i].nidn})',
-                                  style:
-                                      Theme.of(context).textTheme.titleMedium,
-                                ),
-                              ),
-                              if (overloadAsuhan(_loads[i].asuhan))
-                                const StatusBadge(
-                                  label: 'OVERLOAD',
-                                  tone: BadgeTone.danger,
-                                )
-                              else
-                                StatusBadge(
-                                  label:
-                                      '${_loads[i].approved}/${_loads[i].asuhan} KRS',
-                                  tone: _loads[i].approved < _loads[i].asuhan
-                                      ? BadgeTone.pending
-                                      : BadgeTone.success,
-                                ),
-                            ],
+                          AdminListRow(
+                            title: Text(
+                              '${_loads[i].nama} (${_loads[i].nidn})',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            trailing: !AdminRules.asuhan(_loads[i].asuhan).ok
+                                ? const StatusBadge(
+                                    label: 'OVERLOAD',
+                                    tone: BadgeTone.danger,
+                                  )
+                                : StatusBadge(
+                                    label:
+                                        '${_loads[i].approved}/${_loads[i].asuhan} KRS',
+                                    tone: _loads[i].approved < _loads[i].asuhan
+                                        ? BadgeTone.pending
+                                        : BadgeTone.success,
+                                  ),
                           ),
                           const SizedBox(height: 8),
                           ClipRRect(

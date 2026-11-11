@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/admin_page.dart';
+
 import '../models/fase5b_seed.dart';
-import '../models/letters.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/admin_dialog.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/feedback.dart';
@@ -37,20 +39,24 @@ class _LettersPageState extends State<LettersPage> {
   }
 
   void _snack(String m, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(m),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-      ),
+    showAdminSnack(context, m, error: error);
+  }
+
+  void _verify(LetterReq r) {
+    final st = AdminRules.verifyDoc(
+      now: DateTime.now(),
+      terbit: DateTime.now().subtract(const Duration(days: 10)),
+      berlakuHingga: DateTime.now().add(const Duration(days: 80)),
+      revoked: r.status == 'DITOLAK',
     );
+    _snack('Verifikasi QR ${r.nomor ?? r.id}: ${st.name.toUpperCase()}.');
   }
 
   Future<void> _terbitkan(LetterReq r) async {
-    // Pre-flight: demo anggap AKTIF kecuali Dimas (CUTI di seed civitas).
-    final err = letterEligible(r.npm == '2510010045' ? 'CUTI' : 'AKTIF');
-    if (err != null) {
-      _snack(err, error: true);
+    // Pre-flight: validasi status mahasiswa dari data backend/modul civitas.
+    final elig = AdminRules.letterFor(r.npm == '2510010045' ? 'CUTI' : 'AKTIF');
+    if (!elig.ok) {
+      _snack(elig.message ?? 'Ditolak.', error: true);
       return;
     }
     final pejabat = TextEditingController(text: 'Dekan FTI — Dr. Ir. Suyanto');
@@ -96,19 +102,13 @@ class _LettersPageState extends State<LettersPage> {
       return;
     }
     final now = DateTime.now();
-    final seq = nextLetterSeq(
-      now.year,
-      [
-        for (final x in _reqs)
-          if (x.nomor != null)
-            (
-              int.tryParse(x.nomor!.split('/').first) ?? 0,
-              now.year,
-            ),
-      ],
-    );
+    final seq = AdminRules.nextLetterSeq(now.year, [
+      for (final x in _reqs)
+        if (x.nomor != null)
+          (int.tryParse(x.nomor!.split('/').first) ?? 0, now.year),
+    ]);
     setState(() {
-      r.nomor = letterNumber(
+      r.nomor = AdminRules.letterNumber(
         seq: seq,
         kode: r.kode,
         month: now.month,
@@ -149,7 +149,8 @@ class _LettersPageState extends State<LettersPage> {
                 child: SectionHeader(
                   eyebrow: 'Admin / Surat',
                   title: 'Persuratan Akademik',
-                  subtitle: 'UUU/KODE/FTI-SIAKAD/ROMAWI/TTTT • QR publik • 90 hari',
+                  subtitle:
+                      'UUU/KODE/FTI-SIAKAD/ROMAWI/TTTT • QR publik • 90 hari',
                 ),
               ),
               const SizedBox(height: 16),
@@ -193,11 +194,8 @@ class _LettersPageState extends State<LettersPage> {
                     child: Reveal(
                       delayMs: (i * 40).clamp(0, 200),
                       child: BezelCard(
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            '[${list[i].npm}] ${list[i].nama}',
-                          ),
+                        child: AdminListRow(
+                          title: Text('[${list[i].npm}] ${list[i].nama}'),
                           subtitle: Text(
                             '${list[i].jenis} • ${list[i].tujuan}${list[i].nomor != null ? '\n${list[i].nomor}' : ''}',
                           ),
@@ -219,12 +217,21 @@ class _LettersPageState extends State<LettersPage> {
                                   child: const Text('Periksa'),
                                 )
                               else
-                                TextButton(
-                                  onPressed: () => soon(
-                                    context,
-                                    'Unduh PDF ${list[i].nomor ?? ''}',
-                                  ),
-                                  child: const Text('Unduh'),
+                                Wrap(
+                                  spacing: 4,
+                                  children: [
+                                    TextButton(
+                                      onPressed: () => _verify(list[i]),
+                                      child: const Text('QR'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => soon(
+                                        context,
+                                        'Unduh PDF ${list[i].nomor ?? ''}',
+                                      ),
+                                      child: const Text('Unduh'),
+                                    ),
+                                  ],
                                 ),
                             ],
                           ),

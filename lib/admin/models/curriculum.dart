@@ -1,3 +1,6 @@
+import '../rules/admin_thresholds.dart';
+import '../rules/grade_scale.dart';
+
 /// Model + prereq engine kurikulum (spec 04 §3–§4).
 class MataKuliah {
   final String id;
@@ -32,7 +35,7 @@ class Kurikulum {
     required this.nama,
     required this.prodiId,
     required this.tahun,
-    this.totalSksLulus = 144,
+    this.totalSksLulus = AdminThresholds.sksLulusMin,
     this.aktif = false,
   });
 }
@@ -78,8 +81,9 @@ String? validateSksComposition(MataKuliah mk) {
 
 /// Paket smt 1–2 maks 20 SKS (04 §3.3).
 String? validateSemesterCap(int semester, int totalSks) {
-  if ((semester == 1 || semester == 2) && totalSks > 20) {
-    return 'Semester $semester maksimal 20 SKS paket maba.';
+  if ((semester == 1 || semester == 2) &&
+      totalSks > AdminThresholds.sksMabaPaket) {
+    return 'Semester $semester maksimal ${AdminThresholds.sksMabaPaket} SKS paket maba.';
   }
   return null;
 }
@@ -99,7 +103,10 @@ int semesterSksTotal(
   return total;
 }
 
-const _bobot = {'A': 4.0, 'B': 3.0, 'C': 2.0, 'D': 1.0, 'E': 0.0};
+/// Bobot prasyarat: tabel tunggal [gradeBobot].
+/// Perbaikan bug: tabel lokal lama hanya 5 tier sehingga AB/BC
+/// dinilai 0.0 dan prasyarat menolak mahasiswa yang seharusnya lolos.
+const _bobot = gradeBobot;
 
 class PrereqVerdict {
   final bool eligible;
@@ -133,7 +140,7 @@ PrereqVerdict checkPrereq({
         'Belum menempuh prasyarat: $name.',
       );
     }
-    final need = _bobot[rule.minHuruf] ?? 2.0;
+    final need = _bobot[rule.minHuruf] ?? AdminThresholds.bobotLulusMin;
     final have = _bobot[got] ?? 0.0;
     if (have < need) {
       final name = courseName?.call(sid) ?? sid;

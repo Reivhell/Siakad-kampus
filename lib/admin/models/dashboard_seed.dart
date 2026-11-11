@@ -75,7 +75,7 @@ abstract class DashboardSeed {
     ),
     _Warn(
       title: '4 kelas tanpa ruangan',
-      sub: 'id_ruangan IS NULL',
+      sub: 'Atur ruangan sebelum jadwal dikunci',
       tone: BadgeTone.info,
       action: 'Alokasi',
     ),
@@ -106,7 +106,7 @@ abstract class DashboardSeed {
 
   static const liveLog = [
     _Log('10:45', 'Dosen H. memfinalisasi nilai TI-101'),
-    _Log('10:30', 'Admin override KRS mhs 261001001'),
+    _Log('10:30', 'Admin force-add KRS 261001001'),
     _Log('09:15', 'Mahasiswa Y ajukan cuti semester'),
     _Log('08:50', 'Dosen R. absen kelas SI-2101 P3'),
   ];

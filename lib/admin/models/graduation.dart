@@ -1,3 +1,6 @@
+import '../rules/admin_thresholds.dart';
+import '../rules/grade_scale.dart';
+
 /// Degree audit + predikat (spec 12 §3–§4).
 class AuditGrade {
   final String mkId;
@@ -16,15 +19,8 @@ class AuditGrade {
   });
 }
 
-const _bobotAudit = {
-  'A': 4.0,
-  'AB': 3.5,
-  'B': 3.0,
-  'BC': 2.5,
-  'C': 2.0,
-  'D': 1.0,
-  'E': 0.0,
-};
+/// Bobot nilai: tabel tunggal [gradeBobot] (dulu salinan lokal 7-tier).
+const _bobotAudit = gradeBobot;
 
 class DegreeResult {
   final bool pass;
@@ -40,13 +36,17 @@ String predikat({
   required int semesters,
   required bool hasRetake,
 }) {
-  if (ipk >= 3.51 && semesters <= 8 && !hasRetake) {
+  if (ipk >= AdminThresholds.cumlaudeIpk &&
+      semesters <= AdminThresholds.cumlaudeMaxSemester &&
+      !hasRetake) {
     return 'DENGAN PUJIAN (CUM LAUDE)';
   }
-  if (ipk >= 3.01 || (ipk >= 3.51 && semesters > 8)) {
+  if (ipk >= AdminThresholds.sangatMemuaskanIpk ||
+      (ipk >= AdminThresholds.cumlaudeIpk &&
+          semesters > AdminThresholds.cumlaudeMaxSemester)) {
     return 'SANGAT MEMUASKAN';
   }
-  if (ipk >= 2.76) return 'MEMUASKAN';
+  if (ipk >= AdminThresholds.memuaskanIpk) return 'MEMUASKAN';
   return 'CUKUP';
 }
 
@@ -55,7 +55,7 @@ DegreeResult degreeAudit({
   required int semesters,
   required bool libraryClear,
   required bool financeClear,
-  int minSks = 144,
+  int minSks = AdminThresholds.sksLulusMin,
 }) {
   final reasons = <String>[];
   final lulus = grades.where((g) => g.huruf != 'E').toList();
@@ -67,12 +67,20 @@ DegreeResult degreeAudit({
   final dSks = grades
       .where((g) => g.huruf == 'D')
       .fold(0, (a, g) => a + g.sks);
-  if (dSks > 6) reasons.add('Nilai D $dSks SKS > toleransi 6.');
-  if (grades.any((g) => g.wajibNasional && (_bobotAudit[g.huruf] ?? 0) < 2.0)) {
+  if (dSks > AdminThresholds.sksDMaxToleransi) {
+    reasons.add(
+      'Nilai D $dSks SKS > toleransi ${AdminThresholds.sksDMaxToleransi}.',
+    );
+  }
+  if (grades.any(
+    (g) =>
+        g.wajibNasional &&
+        (_bobotAudit[g.huruf] ?? 0) < AdminThresholds.bobotLulusMin,
+  )) {
     reasons.add('MK wajib nasional < C.');
   }
   if (grades.any(
-    (g) => (g.wajib) && (_bobotAudit[g.huruf] ?? 0) < 2.0,
+    (g) => (g.wajib) && (_bobotAudit[g.huruf] ?? 0) < AdminThresholds.bobotLulusMin,
   )) {
     reasons.add('MK wajib / TA < C.');
   }
@@ -83,7 +91,9 @@ DegreeResult degreeAudit({
     den += g.sks;
   }
   final ipk = den == 0 ? 0.0 : double.parse((num / den).toStringAsFixed(2));
-  if (ipk < 2.0) reasons.add('IPK $ipk < 2.00.');
+  if (ipk < AdminThresholds.ipkLulusMin) {
+    reasons.add('IPK $ipk < ${AdminThresholds.ipkLulusMin.toStringAsFixed(2)}.');
+  }
   if (!libraryClear) reasons.add('Belum bebas pustaka.');
   if (!financeClear) reasons.add('Tunggakan keuangan.');
   final retake = grades.any((g) => g.isRetake);

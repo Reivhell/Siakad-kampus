@@ -1,0 +1,13 @@
+name: sia_isolate_entry
+description: Dart isolate entrypoint for mobile and desktop clients.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  sia_backend_core:
+    path: ../sia_backend_core
+  sia_backend_supabase:
+    path: ../sia_backend_supabase

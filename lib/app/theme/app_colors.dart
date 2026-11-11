@@ -30,6 +30,18 @@ abstract class AppColors {
   static const Color infoInk = Color(0xFF0369A1); // 5.17:1 di atas infoSurface
   static const Color neutralInk = Color(0xFF475569); // 6.92:1 di atas slate100
 
+  // Semantics — border (garis badge pill, bukan teks)
+  static const Color passBorder = Color(0xFFBBF7D0);
+  static const Color alertBorder = Color(0xFFFDE68A);
+  static const Color dangerBorder = Color(0xFFFECACA);
+  static const Color infoBorder = Color(0xFFBAE6FD);
+
+  // Prestige gold — HANYA pencapaian (cumlaude/star). Bukan status/info.
+  static const Color goldSurface = Color(0xFFFFF9C4);
+  static const Color goldBorder = Color(0xFFFDE68A);
+  static const Color goldIcon = Color(0xFFA16207); // 4.91:1 di atas goldSurface
+  static const Color goldInk = Color(0xFF854D0E); // 6.83:1 di atas goldSurface
+
   // Aksi destruktif
   static const Color destructive = Color(0xFFC81E30); // 5.7:1 teks putih
 
@@ -55,8 +67,26 @@ abstract class AppColors {
   static const Color darkGold = Color(0xFFF5CD68); // 11.75:1 di atas darkSurface
 
   // Dark Semantics
-  static const Color darkPass = Color(0xFF32D583);
-  static const Color darkAlert = Color(0xFFF7B944);
-  static const Color darkDanger = Color(0xFFF43F5E);
-  static const Color darkInfo = Color(0xFF38BDF8);
+  static const Color darkPass = Color(0xFF32D583); // 7.93:1 di atas successSurface
+  static const Color darkAlert = Color(0xFFF7B944); // 8.57:1 di atas warningSurface
+  static const Color darkDanger = Color(0xFFF43F5E); // 4.50:1 di atas dangerSurface
+  static const Color darkInfo = Color(0xFF38BDF8); // 7.29:1 di atas infoSurface
+
+  // Dark badge surfaces — pasangan jewel di atas, border hairline.
+  static const Color darkSuccessSurface = Color(0xFF0C2B22);
+  static const Color darkSuccessBorder = Color(0xFF14532D);
+  static const Color darkWarningSurface = Color(0xFF33240A);
+  static const Color darkWarningBorder = Color(0xFF92400E);
+  static const Color darkDangerSurface = Color(0xFF3B0F1B);
+  static const Color darkDangerBorder = Color(0xFF9F1239);
+  static const Color darkInfoSurface = Color(0xFF0B2636);
+  static const Color darkInfoBorder = Color(0xFF0C4A6E);
+
+  // Bezel gradients + shadow — elevasi bespoke, bukan gray slop.
+  static const Color darkBezelTop = Color(0xFF12203A);
+  static const Color bezelShadow = Color(0x0A0F172A);
+
+  // Theme roles — primary container + disabled.
+  static const Color primaryContainer = Color(0xFFDCE6FF); // 8.29:1 ink indigo
+  static const Color disabledBorder = Color(0xFFCBD5E1);
 }

@@ -73,5 +73,3 @@ List<Dosen> seedDosenCivitas() => [
     bebanSks: 0,
   ),
 ];
-
-const facultyCodeTI = '100';

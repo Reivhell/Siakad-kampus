@@ -1,3 +1,5 @@
+import '../rules/admin_thresholds.dart';
+
 /// Model + logika murni master data (spec 03 §3–§4).
 class Prodi {
   final String id;
@@ -73,8 +75,12 @@ String? validatePeriodDates(DateTime start, DateTime end) {
     return 'Tanggal selesai tidak boleh mendahului tanggal mulai.';
   }
   final days = end.difference(start).inDays;
-  if (days < 60) return 'Durasi semester minimal 60 hari kalender.';
-  if (days > 210) return 'Durasi semester maksimal 210 hari (7 bulan).';
+  if (days < AdminThresholds.periodMinDays) {
+    return 'Durasi semester minimal ${AdminThresholds.periodMinDays} hari kalender.';
+  }
+  if (days > AdminThresholds.periodMaxDays) {
+    return 'Durasi semester maksimal ${AdminThresholds.periodMaxDays} hari (7 bulan).';
+  }
   return null;
 }
 

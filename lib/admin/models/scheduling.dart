@@ -1,3 +1,5 @@
+import '../rules/admin_thresholds.dart';
+
 /// Conflict engine penjadwalan (spec 06 §4): overlap interval + kapasitas.
 class KelasKuliah {
   final String id;
@@ -80,7 +82,7 @@ String? capacityCheck(int kapasitasKelas, int kapasitasRuang) {
 
 /// Durasi minimal = SKS × 50 mnt (06 §3.3).
 String? durationCheck(int sks, int mulai, int selesai) {
-  final need = sks * 50;
+  final need = sks * AdminThresholds.sksMinutes;
   if (selesai - mulai < need) {
     return 'Durasi ${selesai - mulai} mnt < minimal $need mnt ($sks SKS).';
   }
@@ -90,9 +92,12 @@ String? durationCheck(int sks, int mulai, int selesai) {
 /// Blackout Jumat 11:30–13:00 (06 §7): warning, bukan blokir.
 bool isBlackoutWarning(int hari, int mulai, int selesai) {
   if (hari != 5) return false;
-  const bStart = 11 * 60 + 30;
-  const bEnd = 13 * 60;
-  return intervalsOverlap(mulai, selesai, bStart, bEnd);
+  return intervalsOverlap(
+    mulai,
+    selesai,
+    AdminThresholds.fridayBlackoutStart,
+    AdminThresholds.fridayBlackoutEnd,
+  );
 }
 
 /// Turunkan kapasitas ditolak bila < terdaftar (06 §7).

@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 void soon(BuildContext context, String fitur) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: Text('$fitur — demo lokal. Aktif penuh saat backend wiring.'),
+      content: Text(
+        '$fitur belum tersambung — menampilkan data contoh. Aktif penuh setelah sinkron Supabase.',
+      ),
       behavior: SnackBarBehavior.floating,
     ),
   );

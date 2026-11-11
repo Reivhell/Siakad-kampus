@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/admin_page.dart';
+
 import '../models/master_data.dart';
-import '../models/master_seed.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/admin_dialog.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/empty_state.dart';
@@ -9,6 +11,7 @@ import '../widgets/filter_bar.dart';
 import '../widgets/reveal.dart';
 import '../widgets/section_header.dart';
 import '../widgets/status_badge.dart';
+import '../core/admin_api_scope.dart';
 
 /// Master Data: Prodi | Periode | Ruangan (spec 03).
 /// Periode: single-active invariant + wizard konfirmasi ketik.
@@ -20,17 +23,90 @@ class MasterPage extends StatefulWidget {
 }
 
 class _MasterPageState extends State<MasterPage> {
-  late List<Prodi> _prodi;
-  late List<Periode> _periode;
-  late List<Ruangan> _ruang;
+  List<Prodi> _prodi = const [];
+  List<Periode> _periode = const [];
+  List<Ruangan> _ruang = const [];
   final _search = TextEditingController();
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _prodi = seedProdi();
-    _periode = seedPeriode();
-    _ruang = seedRuangan();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final client = AdminApiScope.clientOf(context);
+      if (client == null) throw Exception('Sesi API tidak tersedia.');
+      final data = await client.getJson('/api/v1/master');
+      final m = data is Map ? data : const {};
+      List<T> mapList<T>(String k, T Function(Map<String, dynamic> raw) f) {
+        final v = m[k];
+        if (v is! List) return <T>[];
+        return v
+            .whereType<Map>()
+            .map((e) => f(e.cast<String, dynamic>()))
+            .toList();
+      }
+
+      final prodi = mapList(
+        'program_studi',
+        (r) => Prodi(
+          id: (r['id'] ?? '').toString(),
+          kode: (r['kode'] ?? '').toString(),
+          nama: (r['nama'] ?? '').toString(),
+          jenjang: (r['jenjang'] ?? '').toString(),
+        ),
+      );
+      final periode = mapList(
+        'periode_akademik',
+        (r) => Periode(
+          id: (r['id'] ?? '').toString(),
+          nama: (r['nama'] ?? '').toString(),
+          tahun: (r['tahun_akademik'] ?? '').toString(),
+          semester: (r['semester'] ?? '').toString(),
+          mulai:
+              DateTime.tryParse((r['tanggal_mulai'] ?? '').toString()) ??
+              DateTime.now(),
+          selesai:
+              DateTime.tryParse((r['tanggal_selesai'] ?? '').toString()) ??
+              DateTime.now(),
+          aktif: r['aktif'] == true,
+        ),
+      );
+      final ruang = mapList(
+        'ruangan',
+        (r) => Ruangan(
+          id: (r['id'] ?? '').toString(),
+          kode: (r['kode'] ?? '').toString(),
+          nama: (r['nama'] ?? r['kode'] ?? '').toString(),
+          kapasitas: (r['kapasitas'] is num)
+              ? (r['kapasitas'] as num).toInt()
+              : 0,
+          gedung: (r['gedung'] ?? '-').toString(),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _prodi = prodi;
+        _periode = periode;
+        _ruang = ruang;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
   }
 
   @override
@@ -47,13 +123,7 @@ class _MasterPageState extends State<MasterPage> {
   }
 
   void _snack(String m, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(m),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-      ),
-    );
+    showAdminSnack(context, m, error: error);
   }
 
   Future<void> _switchPeriode(Periode target) async {
@@ -71,7 +141,7 @@ class _MasterPageState extends State<MasterPage> {
             children: [
               Text('Aktifkan: ${target.nama}'),
               Text(
-                'Pre-flight: nilai 98,4% final ✓ • 12 mhs administrasi gantung [!]',
+                'Pre-flight: pastikan data nilai dan administrasi periode lama sudah final sebelum aktivasi.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 8),
@@ -108,17 +178,24 @@ class _MasterPageState extends State<MasterPage> {
       ),
     );
     if (yes != true) return;
-    setState(() {
-      _periode = switchActivePeriod(_periode, target.id);
-    });
-    _snack('Periode aktif: ${target.nama}. "$old" diarsipkan atomik.');
+    final client = AdminApiScope.clientOf(context);
+    if (client == null) { _snack('Sesi API tidak tersedia.', error: true); return; }
+    try {
+      await client.postJson('/api/v1/master/periode/activate', {'id': target.id});
+      if (!mounted) return;
+      _snack('Periode ${target.nama} diaktifkan.');
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      _snack(e.toString(), error: true);
+    }
   }
 
   Future<void> _prodiForm({Prodi? edit}) async {
     final kode = TextEditingController(text: edit?.kode ?? '');
     final nama = TextEditingController(text: edit?.nama ?? '');
     String jenjang = edit?.jenjang ?? 'S1';
-    final locked = edit != null && prodiKodeLocked(edit);
+    final locked = edit != null && AdminRules.isProdiKodeLocked(edit);
     final lockedCount = edit?.studentCount ?? 0;
     final ok = await showAdminForm<bool>(
       context: context,
@@ -183,33 +260,25 @@ class _MasterPageState extends State<MasterPage> {
       _snack('Kode + nama wajib.', error: true);
       return;
     }
-    if (_prodi.any(
-      (p) =>
-          p.kode == kode.text.trim() && p.id != edit?.id ||
-          p.nama.toLowerCase() == nama.text.trim().toLowerCase() &&
-              p.id != edit?.id,
-    )) {
-      _snack('Kode/nama prodi duplikat.', error: true);
+    final client = AdminApiScope.clientOf(context);
+    if (client == null) {
+      _snack('Sesi API tidak tersedia.', error: true);
       return;
     }
-    setState(() {
-      if (edit == null) {
-        _prodi.add(
-          Prodi(
-            id: 'p-${DateTime.now().millisecondsSinceEpoch}',
-            kode: kode.text.trim(),
-            nama: nama.text.trim(),
-            jenjang: jenjang,
-          ),
-        );
-      } else {
-        if (!locked) edit.kode = kode.text.trim();
-        edit
-          ..nama = nama.text.trim()
-          ..jenjang = jenjang;
-      }
-    });
-    _snack('Prodi disimpan.');
+    try {
+      await client.postJson('/api/v1/master/prodi', {
+        if (edit != null) 'id': edit.id,
+        'kode': locked ? edit!.kode : kode.text.trim(),
+        'nama': nama.text.trim(),
+        'jenjang': jenjang,
+      });
+      if (!mounted) return;
+      _snack('Prodi disimpan.');
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      _snack(e.toString(), error: true);
+    }
   }
 
   Future<void> _ruangForm({Ruangan? edit}) async {
@@ -285,38 +354,53 @@ class _MasterPageState extends State<MasterPage> {
     );
     if (ok != true) return;
     final k = int.tryParse(kap.text.trim()) ?? 0;
-    if (kode.text.trim().isEmpty || nama.text.trim().isEmpty || k <= 0) {
+    if (kode.text.trim().isEmpty ||
+        nama.text.trim().isEmpty ||
+        !AdminRules.positiveCapacity(k).ok) {
       _snack('Kode, nama valid + kapasitas > 0 wajib.', error: true);
       return;
     }
-    setState(() {
-      if (edit == null) {
-        _ruang.add(
-          Ruangan(
-            id: 'r-${DateTime.now().millisecondsSinceEpoch}',
-            kode: kode.text.trim(),
-            nama: nama.text.trim(),
-            kapasitas: k,
-            gedung: gedung.text.trim().isEmpty
-                ? 'Gedung Utama'
-                : gedung.text.trim(),
-            tersedia: tersedia,
-          ),
-        );
-      } else {
-        edit
-          ..kode = kode.text.trim()
-          ..nama = nama.text.trim()
-          ..kapasitas = k
-          ..gedung = gedung.text.trim()
-          ..tersedia = tersedia;
-      }
-    });
-    _snack('Ruangan disimpan.');
+    final client = AdminApiScope.clientOf(context);
+    if (client == null) { _snack('Sesi API tidak tersedia.', error: true); return; }
+    try {
+      await client.postJson('/api/v1/master/ruangan', {
+        if (edit != null) 'id': edit.id,
+        'kode': kode.text.trim(),
+        'nama': nama.text.trim(),
+        'kapasitas': k,
+        'gedung': gedung.text.trim().isEmpty ? null : gedung.text.trim(),
+        'tersedia': tersedia,
+      });
+      if (!mounted) return;
+      _snack('Ruangan disimpan.');
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      _snack(e.toString(), error: true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonal(
+              onPressed: _load,
+              child: const Text('Muat ulang'),
+            ),
+          ],
+        ),
+      );
+    }
     final width = MediaQuery.sizeOf(context).width;
     return DefaultTabController(
       length: 3,
@@ -411,11 +495,10 @@ class _MasterPageState extends State<MasterPage> {
                   itemBuilder: (_, i) {
                     final p = list[i];
                     return BezelCard(
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
+                      child: AdminListRow(
                         title: Text('${p.nama} (${p.jenjang})'),
                         subtitle: Text(
-                          'Kode ${p.kode} • ${p.studentCount} mhs${prodiKodeLocked(p) ? ' • kode terkunci' : ''}',
+                          'Kode ${p.kode} • ${p.studentCount} mhs${AdminRules.isProdiKodeLocked(p) ? ' • kode terkunci' : ''}',
                         ),
                         trailing: IconButton(
                           tooltip: 'Edit',
@@ -456,13 +539,12 @@ class _MasterPageState extends State<MasterPage> {
             itemBuilder: (_, i) {
               final p = _periode[i];
               return BezelCard(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
+                child: AdminListRow(
                   title: Text(p.nama),
                   subtitle: Text(
                     '${p.tahun} • ${p.semester} • ${_fmt(p.mulai)} – ${_fmt(p.selesai)}',
-                    style: const TextStyle(
-                      fontFeatures: [FontFeature.tabularFigures()],
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                   trailing: Wrap(
@@ -471,9 +553,7 @@ class _MasterPageState extends State<MasterPage> {
                     children: [
                       StatusBadge(
                         label: p.aktif ? 'AKTIF' : 'ARSIP',
-                        tone: p.aktif
-                            ? BadgeTone.success
-                            : BadgeTone.neutral,
+                        tone: p.aktif ? BadgeTone.success : BadgeTone.neutral,
                       ),
                       if (!p.aktif)
                         FilledButton.tonal(
@@ -509,7 +589,7 @@ class _MasterPageState extends State<MasterPage> {
               crossAxisCount: width >= 1024 ? 3 : (width >= 600 ? 2 : 1),
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              mainAxisExtent: 190,
+              mainAxisExtent: 190 * MediaQuery.textScalerOf(context).scale(1),
             ),
             itemCount: _ruang.length,
             itemBuilder: (_, i) {
@@ -519,23 +599,19 @@ class _MasterPageState extends State<MasterPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            r.nama,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                        ),
-                        StatusBadge(
-                          label: r.tersedia ? 'TERSEDIA' : 'RENOVASI',
-                          tone: r.tersedia
-                              ? BadgeTone.success
-                              : BadgeTone.pending,
-                        ),
-                      ],
+                    AdminListRow(
+                      title: Text(
+                        r.nama,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      trailing: StatusBadge(
+                        label: r.tersedia ? 'TERSEDIA' : 'RENOVASI',
+                        tone: r.tersedia
+                            ? BadgeTone.success
+                            : BadgeTone.pending,
+                      ),
                     ),
                     Text(
                       '${r.kode} • ${r.gedung}',

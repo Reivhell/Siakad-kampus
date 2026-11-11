@@ -60,10 +60,12 @@ List<AuditEntry> seedAudit() {
       ip: '36.81.44.10',
     ),
   ];
+  // Kanonis: kronologis naik. UI menampilkan terbaru lebih dulu.
+  raw.sort((a, b) => a.waktu.compareTo(b.waktu));
   var prev = '';
   final out = <AuditEntry>[];
   for (final e in raw) {
-    final h = chainHash(e.id, prev);
+    final h = auditHash(e, prev);
     out.add(
       AuditEntry(
         id: e.id,

@@ -1,31 +1,8 @@
-import 'package:flutter/material.dart';
+// Jalur lama — implementasi pindah ke `lib/shared/login/` (gerbang peran).
+// Berkas ini dipertahankan agar import lama tetap jalan.
+export 'package:siakad_kampus/shared/login/role_gate.dart';
 
-import '../admin/admin_shell.dart';
-import 'login_page.dart';
+import 'package:siakad_kampus/shared/login/role_gate.dart';
 
-/// Gerbang sesi demo: belum login → LoginPage, sudah → AdminShell.
-/// State in-memory; ganti Riverpod + Supabase session saat backend wiring.
-class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
-
-  @override
-  State<AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<AuthGate> {
-  String? _npm;
-
-  @override
-  Widget build(BuildContext context) {
-    final npm = _npm;
-    if (npm == null) {
-      return LoginPage(
-        onSuccess: (signedInNpm) => setState(() => _npm = signedInNpm),
-      );
-    }
-    return AdminShell(
-      userLabel: npm.length >= 4 ? npm.substring(npm.length - 4) : npm,
-      onLogout: () => setState(() => _npm = null),
-    );
-  }
-}
+/// Nama lama gerbang sesi (tipe identik dengan [RoleGate]).
+typedef AuthGate = RoleGate;

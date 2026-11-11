@@ -16,7 +16,7 @@ abstract class SiakadTheme {
       colorScheme: const ColorScheme.light(
         primary: AppColors.indigoBlue,
         onPrimary: Colors.white,
-        primaryContainer: Color(0xFFDCE6FF),
+        primaryContainer: AppColors.primaryContainer,
         onPrimaryContainer: AppColors.indigoBlue,
         secondary: AppColors.goldAccent,
         onSecondary: AppColors.lightTextPrimary,
@@ -64,7 +64,7 @@ abstract class SiakadTheme {
         ),
         disabledBorder: OutlineInputBorder(
           borderRadius: radiusSm,
-          borderSide: BorderSide(color: Color(0xFFCBD5E1)),
+          borderSide: BorderSide(color: AppColors.disabledBorder),
         ),
       ),
       snackBarTheme: const SnackBarThemeData(
@@ -88,7 +88,7 @@ abstract class SiakadTheme {
         primary: AppColors.darkPrimary,
         onPrimary: AppColors.darkBg,
         primaryContainer: AppColors.darkSurfaceInteractive,
-        onPrimaryContainer: Color(0xFFDCE6FF),
+        onPrimaryContainer: AppColors.primaryContainer,
         secondary: AppColors.darkGold,
         onSecondary: AppColors.darkBg,
         secondaryContainer: AppColors.darkSurfaceInteractive,

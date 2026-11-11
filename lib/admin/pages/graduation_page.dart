@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/admin_page.dart';
+
 import '../models/fase5_seed.dart';
 import '../models/graduation.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/admin_dialog.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/reveal.dart';
@@ -26,7 +29,7 @@ class _GraduationPageState extends State<GraduationPage> {
     _calon = seedYudisium();
   }
 
-  DegreeResult _audit(YudisiumCalon c) => degreeAudit(
+  DegreeResult _audit(YudisiumCalon c) => AdminRules.graduateDetail(
     grades: c.grades,
     semesters: c.semesters,
     libraryClear: c.library,
@@ -34,13 +37,7 @@ class _GraduationPageState extends State<GraduationPage> {
   );
 
   void _snack(String m, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(m),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-      ),
-    );
+    showAdminSnack(context, m, error: error);
   }
 
   Future<void> _detail(YudisiumCalon c) async {
@@ -108,9 +105,9 @@ class _GraduationPageState extends State<GraduationPage> {
         for (final x in _calon)
           if (x != c && x.pin != null) x.pin!,
       ];
-      final err = validatePin(pin, otherPins);
-      if (err != null) {
-        _snack(err, error: true);
+      final pinCheck = AdminRules.pin(pin, otherPins);
+      if (!pinCheck.ok) {
+        _snack(pinCheck.message ?? 'PIN ditolak.', error: true);
         return;
       }
       setState(() => c.pin = pin);
@@ -196,15 +193,15 @@ class _GraduationPageState extends State<GraduationPage> {
                       builder: (_) {
                         final r = _audit(_calon[i]);
                         return BezelCard(
-                          child: ListTile(
-                            contentPadding: EdgeInsets.zero,
+                          child: AdminListRow(
                             title: Text(
                               '${_calon[i].npm} • ${_calon[i].nama}',
-                              style: const TextStyle(
-                                fontFeatures: [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
                             ),
                             subtitle: Text(
                               r.pass

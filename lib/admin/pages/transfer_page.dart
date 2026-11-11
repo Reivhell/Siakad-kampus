@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/admin_page.dart';
+
 import '../models/fase5b_seed.dart';
-import '../models/transfer.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/reveal.dart';
 import '../widgets/section_header.dart';
@@ -25,9 +27,7 @@ class _TransferPageState extends State<TransferPage> {
   }
 
   void _snack(String m) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(m), behavior: SnackBarBehavior.floating),
-    );
+    showAdminSnack(context, m);
   }
 
   @override
@@ -58,26 +58,20 @@ class _TransferPageState extends State<TransferPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                '[${c.npm}] ${c.nama}',
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.titleMedium,
-                              ),
-                            ),
-                            StatusBadge(
-                              label: c.status,
-                              tone: c.status == 'DISAHKAN'
-                                  ? BadgeTone.success
-                                  : BadgeTone.pending,
-                            ),
-                          ],
+                        AdminListRow(
+                          title: Text(
+                            '[${c.npm}] ${c.nama}',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          trailing: StatusBadge(
+                            label: c.status,
+                            tone: c.status == 'DISAHKAN'
+                                ? BadgeTone.success
+                                : BadgeTone.pending,
+                          ),
                         ),
                         Text(
-                          '${c.jalur} ${footnoteFor[c.jalur] ?? ''} • ${c.asal}',
+                          '${c.jalur} ${AdminRules.transferFootnote(c.jalur) ?? ''} • ${c.asal}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const Divider(height: 24),
@@ -98,12 +92,15 @@ class _TransferPageState extends State<TransferPage> {
                                 ),
                                 Expanded(
                                   child: Text(
-                                    '${m.lokalMkId} → ${m.diakuiHuruf} (${m.diakuiBobot})\n${mappingPattern(nAsal: 1, nLokal: 1)}',
-                                    style: const TextStyle(
-                                      fontFeatures: [
-                                        FontFeature.tabularFigures(),
-                                      ],
-                                    ),
+                                    '${m.lokalMkId} → ${m.diakuiHuruf} (${m.diakuiBobot})\n${AdminRules.transferPattern(nAsal: m.asalKode.split('+').length, nLokal: 1)}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          fontFeatures: const [
+                                            FontFeature.tabularFigures(),
+                                          ],
+                                        ),
                                   ),
                                 ),
                               ],
@@ -114,12 +111,23 @@ class _TransferPageState extends State<TransferPage> {
                           children: [
                             FilledButton.tonal(
                               onPressed: () {
-                                for (final m in c.maps) {
-                                  final err = guardAsalHuruf(m.asalHuruf);
-                                  if (err != null) {
-                                    _snack(err);
-                                    return;
-                                  }
+                                // Total dihitung sekali (dulu fold 2× per baris).
+                                final totalSks = c.maps.fold(
+                                  0,
+                                  (a, x) => a + x.asalSks,
+                                );
+                                final g = RuleCheck.all([
+                                  for (final m in c.maps)
+                                    AdminRules.transfer(
+                                      asalHuruf: m.asalHuruf,
+                                      totalDiakui: totalSks,
+                                      paketSks: totalSks,
+                                      isMbkm: c.jalur.startsWith('MBKM'),
+                                    ),
+                                ]);
+                                if (!g.ok) {
+                                  _snack(g.message ?? 'Ditolak.');
+                                  return;
                                 }
                                 setState(() => c.status = 'DISAHKAN');
                                 _snack(

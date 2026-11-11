@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/admin_page.dart';
+
 import '../models/attendance.dart';
 import '../models/attendance_seed.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/admin_dialog.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/reveal.dart';
@@ -28,15 +31,13 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   void _snack(String m) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(m), behavior: SnackBarBehavior.floating),
-    );
+    showAdminSnack(context, m);
   }
 
   Future<void> _dispensasi(SkriningMhs s) async {
     final surat = TextEditingController();
     int sesi = 2;
-    final el = evaluateUas(
+    final el = AdminRules.uasDetail(
       total: s.total,
       hadir: s.hadir,
       dispensasi: s.dispensasi,
@@ -46,7 +47,7 @@ class _AttendancePageState extends State<AttendancePage> {
       title: 'Dispensasi ${s.npm}',
       child: StatefulBuilder(
         builder: (ctx, setS) {
-          final proj = projectedPct(
+          final proj = AdminRules.projectedUas(
             total: s.total,
             hadir: s.hadir,
             dispensasiNow: s.dispensasi,
@@ -81,7 +82,8 @@ class _AttendancePageState extends State<AttendancePage> {
               ),
               const SizedBox(height: 8),
               StatusBadge(
-                label: 'Proyeksi $proj% ${proj >= 75 ? '🟢 BERHAK' : '🔴 TETAP GUGUR'}',
+                label:
+                    'Proyeksi $proj% ${proj >= 75 ? '🟢 BERHAK' : '🔴 TETAP GUGUR'}',
                 tone: proj >= 75 ? BadgeTone.success : BadgeTone.danger,
               ),
               const SizedBox(height: 16),
@@ -114,12 +116,11 @@ class _AttendancePageState extends State<AttendancePage> {
     final width = MediaQuery.sizeOf(context).width;
     final atRisk = _skrining
         .where(
-          (s) =>
-              !evaluateUas(
-                total: s.total,
-                hadir: s.hadir,
-                dispensasi: s.dispensasi,
-              ).eligible,
+          (s) => !AdminRules.uasDetail(
+            total: s.total,
+            hadir: s.hadir,
+            dispensasi: s.dispensasi,
+          ).eligible,
         )
         .length;
 
@@ -152,28 +153,24 @@ class _AttendancePageState extends State<AttendancePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '[${_kelas[i].kode}] ${_kelas[i].mkNama}',
-                                  style:
-                                      Theme.of(context).textTheme.titleMedium,
-                                ),
+                          AdminListRow(
+                            title: Text(
+                              '[${_kelas[i].kode}] ${_kelas[i].mkNama}',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            trailing: StatusBadge(
+                              label: AdminRules.meetingTrack(
+                                _kelas[i].realisasi,
+                                mingguBerjalan,
                               ),
-                              StatusBadge(
-                                label: meetingTrack(
-                                  _kelas[i].realisasi,
-                                  mingguBerjalan,
-                                ),
-                                tone: isBehindSchedule(
-                                  _kelas[i].realisasi,
-                                  mingguBerjalan,
-                                )
-                                    ? BadgeTone.danger
-                                    : BadgeTone.success,
-                              ),
-                            ],
+                              tone:
+                                  !AdminRules.meetingBehind(
+                                    _kelas[i].realisasi,
+                                    mingguBerjalan,
+                                  ).ok
+                                  ? BadgeTone.danger
+                                  : BadgeTone.success,
+                            ),
                           ),
                           Text(
                             '${_kelas[i].dosen} • ${_kelas[i].realisasi}/16 sesi',
@@ -207,31 +204,29 @@ class _AttendancePageState extends State<AttendancePage> {
                   child: Reveal(
                     child: Builder(
                       builder: (_) {
-                        final el = evaluateUas(
+                        final el = AdminRules.uasDetail(
                           total: s.total,
                           hadir: s.hadir,
                           dispensasi: s.dispensasi,
                         );
                         return BezelCard(
-                          child: ListTile(
-                            contentPadding: EdgeInsets.zero,
+                          child: AdminListRow(
                             title: Text('${s.npm} • ${s.nama}'),
                             subtitle: Text(
                               '${s.hadir}+${s.dispensasi} dispensasi / ${s.total} → ${el.percentage}%',
-                              style: const TextStyle(
-                                fontFeatures: [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
                             ),
                             trailing: Wrap(
                               spacing: 4,
                               crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 StatusBadge(
-                                  label: el.eligible
-                                      ? 'BERHAK'
-                                      : 'GUGUR',
+                                  label: el.eligible ? 'BERHAK' : 'GUGUR',
                                   tone: el.eligible
                                       ? BadgeTone.success
                                       : BadgeTone.danger,

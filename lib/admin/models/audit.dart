@@ -1,3 +1,8 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import '../rules/admin_thresholds.dart';
+
 /// Model audit trail (spec 10): taksonomi, filter, anomali, diff, hash chain.
 class AuditEntry {
   final String id;
@@ -46,7 +51,9 @@ bool isAnomaly(AuditEntry e) {
   final kritis = e.aksi.contains('NILAI') ||
       e.aksi.contains('KRS') ||
       e.aksi.contains('YUDISIUM');
-  return kritis && (h >= 22 || h < 6);
+  return kritis &&
+      (h >= AdminThresholds.anomaliMalamDari ||
+          h < AdminThresholds.anomaliMalamSampai);
 }
 
 List<AuditEntry> filterAudit(
@@ -89,14 +96,35 @@ List<DiffRow> diffStates(
   ];
 }
 
-/// Pseudo hash chain demo (produksi: SHA-256 di DB, 10 §4.2).
-String chainHash(String id, String prev) => '${id.hashCode ^ prev.hashCode}';
+/// Hash kanonis SHA-256: seluruh payload ikut disegel, bukan hanya id.
+///
+/// Format kanonis memakai urutan field tetap + map `before`/`after` yang
+/// diurutkan, sehingga hasil deterministik lintas platform dan run.
+String auditHash(AuditEntry e, String prev) {
+  final payload = <String>[
+    prev,
+    e.id,
+    e.waktu.toUtc().toIso8601String(),
+    e.aktor,
+    e.aksi,
+    e.entitas,
+    e.ip,
+    _canonicalMap(e.before),
+    _canonicalMap(e.after),
+  ].join('\u0001');
+  return sha256.convert(utf8.encode(payload)).toString();
+}
+
+String _canonicalMap(Map<String, String> m) {
+  final keys = m.keys.toList()..sort();
+  return keys.map((k) => '$k=${m[k]}').join('\u0002');
+}
 
 bool verifyChain(List<AuditEntry> ordered) {
   for (var i = 0; i < ordered.length; i++) {
     final wantPrev = i == 0 ? '' : ordered[i - 1].hash;
     if (ordered[i].hashPrev != wantPrev) return false;
-    if (ordered[i].hash != chainHash(ordered[i].id, ordered[i].hashPrev)) {
+    if (ordered[i].hash != auditHash(ordered[i], ordered[i].hashPrev)) {
       return false;
     }
   }

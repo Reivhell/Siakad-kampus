@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/admin_page.dart';
+
 import '../models/curriculum.dart';
 import '../models/curriculum_seed.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/admin_dialog.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/reveal.dart';
@@ -42,7 +45,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
   Map<String, MataKuliah> get _byId => {for (final m in _mk) m.id: m};
 
   int _semesterTotal(int smt) =>
-      semesterSksTotal(_edisi, smt, _maps, _byId);
+      AdminRules.semesterTotal(_edisi, smt, _maps, _byId);
 
   int get _grandTotal {
     var t = 0;
@@ -53,13 +56,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
   }
 
   void _snack(String m, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(m),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-      ),
-    );
+    showAdminSnack(context, m, error: error);
   }
 
   Future<void> _mkForm({MataKuliah? edit}) async {
@@ -168,7 +165,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
       sksPraktikum: int.tryParse(prak.text) ?? 0,
       semesterDefault: edit?.semesterDefault ?? 1,
     );
-    final err = validateSksComposition(draft);
+    final err = AdminRules.sksComposition(draft).asError;
     if (draft.kode.isEmpty || draft.nama.isEmpty || err != null) {
       _snack(err ?? 'Kode + nama wajib.', error: true);
       return;
@@ -244,8 +241,11 @@ class _CurriculumPageState extends State<CurriculumPage> {
                         syaratMkId: cand.id,
                       ),
                     ];
-                    if (hasPrereqCycle(trial)) {
-                      _snack('Ditolak: prasyarat melingkar terdeteksi.', error: true);
+                    if (!AdminRules.prereqCycle(trial).ok) {
+                      _snack(
+                        'Ditolak: prasyarat melingkar terdeteksi.',
+                        error: true,
+                      );
                       return;
                     }
                     setState(() => _rules = trial);
@@ -263,9 +263,7 @@ class _CurriculumPageState extends State<CurriculumPage> {
                 onPressed: () {
                   final v = int.tryParse(minSks.text.trim()) ?? 0;
                   setState(() {
-                    _rules.removeWhere(
-                      (r) => r.mkId == mk.id && r.minSks > 0,
-                    );
+                    _rules.removeWhere((r) => r.mkId == mk.id && r.minSks > 0);
                     if (v > 0) {
                       _rules.add(
                         PrereqRule(
@@ -314,16 +312,22 @@ class _CurriculumPageState extends State<CurriculumPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Reveal(
-                child: SectionHeader(
-                  eyebrow: 'Admin / Kurikulum',
-                  title: 'Kurikulum & Mata Kuliah',
-                  subtitle:
-                      '${kur.nama} • total paket $_grandTotal SKS (target ${kur.totalSksLulus})',
-                  action: FilledButton.icon(
-                    onPressed: _mkForm,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Tambah MK'),
-                  ),
+                child: Builder(
+                  builder: (_) {
+                    // Verdict paket via fasade (04 §3.3 + 12 §3).
+                    final paket = AdminRules.curriculumTotal(_grandTotal);
+                    return SectionHeader(
+                      eyebrow: 'Admin / Kurikulum',
+                      title: 'Kurikulum & Mata Kuliah',
+                      subtitle:
+                          '${kur.nama} • total paket $_grandTotal SKS (target ${kur.totalSksLulus})${paket.ok ? '' : ' • KURANG!'}',
+                      action: FilledButton.icon(
+                        onPressed: _mkForm,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Tambah MK'),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 16),
@@ -341,12 +345,10 @@ class _CurriculumPageState extends State<CurriculumPage> {
                           for (final k in _kur)
                             DropdownMenuEntry(
                               value: k.id,
-                              label:
-                                  '${k.nama}${k.aktif ? ' ● AKTIF' : ''}',
+                              label: '${k.nama}${k.aktif ? ' ● AKTIF' : ''}',
                             ),
                         ],
-                        onSelected: (v) =>
-                            setState(() => _edisi = v ?? _edisi),
+                        onSelected: (v) => setState(() => _edisi = v ?? _edisi),
                       ),
                       SizedBox(
                         width: 240,
@@ -373,39 +375,39 @@ class _CurriculumPageState extends State<CurriculumPage> {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 12),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (var s = 1; s <= 8; s++)
-                              Container(
-                                width: 220,
-                                margin: const EdgeInsets.only(right: 12),
-                                child: _SemesterCol(
-                                  semester: s,
-                                  total: _semesterTotal(s),
-                                  cards: [
-                                    for (final m in _maps.where(
-                                      (x) =>
-                                          x.kurikulumId == _edisi &&
-                                          x.semester == s,
-                                    ))
-                                      if (_byId[m.mkId] != null)
-                                        _MkCard(
-                                          mk: _byId[m.mkId]!,
-                                          sifat: m.sifat,
-                                          onTap: () => _prereqDialog(
-                                            _byId[m.mkId]!,
+                      Scrollbar(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (var s = 1; s <= 8; s++)
+                                Container(
+                                  width: 220,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  child: _SemesterCol(
+                                    semester: s,
+                                    total: _semesterTotal(s),
+                                    cards: [
+                                      for (final m in _maps.where(
+                                        (x) =>
+                                            x.kurikulumId == _edisi &&
+                                            x.semester == s,
+                                      ))
+                                        if (_byId[m.mkId] != null)
+                                          _MkCard(
+                                            mk: _byId[m.mkId]!,
+                                            sifat: m.sifat,
+                                            onTap: () =>
+                                                _prereqDialog(_byId[m.mkId]!),
+                                            onEdit: () =>
+                                                _mkForm(edit: _byId[m.mkId]),
                                           ),
-                                          onEdit: () => _mkForm(
-                                            edit: _byId[m.mkId],
-                                          ),
-                                        ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -427,23 +429,23 @@ class _CurriculumPageState extends State<CurriculumPage> {
                   child: Reveal(
                     delayMs: (i * 30).clamp(0, 300),
                     child: BezelCard(
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
+                      child: AdminListRow(
                         title: Text('[${bank[i].kode}] ${bank[i].nama}'),
                         subtitle: Text(
                           '${bank[i].sks} SKS (T${bank[i].sksTeori}+P${bank[i].sksPraktikum}) • ${bank[i].jenis}',
-                          style: const TextStyle(
-                            fontFeatures: [FontFeature.tabularFigures()],
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
                         ),
                         trailing: Wrap(
                           spacing: 4,
                           children: [
                             IconButton(
                               tooltip: 'Atur prasyarat',
-                              icon: const Icon(
-                                Icons.account_tree_outlined,
-                              ),
+                              icon: const Icon(Icons.account_tree_outlined),
                               onPressed: () => _prereqDialog(bank[i]),
                             ),
                             IconButton(
@@ -498,9 +500,8 @@ class _SemesterCol extends StatelessWidget {
         if (capErr != null)
           Text(
             capErr,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.error,
-            ),
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: Theme.of(context).colorScheme.error),
           ),
         const SizedBox(height: 8),
         if (cards.isEmpty)
@@ -547,9 +548,8 @@ class _MkCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.1),
+                    color: Theme.of(context).colorScheme.primary
+                        .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
@@ -565,21 +565,12 @@ class _MkCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.titleSmall,
             ),
-            Text(
-              '${mk.sks} SKS',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            Text('${mk.sks} SKS', style: Theme.of(context).textTheme.bodySmall),
             Wrap(
               spacing: 0,
               children: [
-                TextButton(
-                  onPressed: onTap,
-                  child: const Text('Prasyarat'),
-                ),
-                TextButton(
-                  onPressed: onEdit,
-                  child: const Text('Edit'),
-                ),
+                TextButton(onPressed: onTap, child: const Text('Prasyarat')),
+                TextButton(onPressed: onEdit, child: const Text('Edit')),
               ],
             ),
           ],

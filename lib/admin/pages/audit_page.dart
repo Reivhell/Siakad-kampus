@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../models/audit.dart';
-import '../models/audit_seed.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/admin_dialog.dart';
+import '../widgets/admin_page.dart';
 import '../widgets/bezel_card.dart';
-import '../widgets/feedback.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/filter_bar.dart';
 import '../widgets/reveal.dart';
 import '../widgets/section_header.dart';
 import '../widgets/status_badge.dart';
+import '../core/admin_api_scope.dart';
 
 /// Audit Trail Explorer (spec 10): filter + diff inspector + anomali + chain.
 class AuditPage extends StatefulWidget {
@@ -27,10 +28,71 @@ class _AuditPageState extends State<AuditPage> {
   int _page = 0;
   static const _perPage = 10;
 
+  bool _loading = true;
+  String? _loadError;
+
   @override
   void initState() {
     super.initState();
-    _all = seedAudit();
+    _all = const [];
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final client = AdminApiScope.clientOf(context);
+      if (client == null) {
+        if (!mounted) return;
+        setState(() {
+          _all = const [];
+          _loading = false;
+          _loadError = 'Sesi API tidak tersedia.';
+        });
+        return;
+      }
+      final data = await client.getJson('/api/v1/audit?limit=100');
+      final items = (data is Map ? data['items'] : null);
+      final parsed = <AuditEntry>[];
+      if (items is List) {
+        for (final raw in items.whereType<Map>()) {
+          parsed.add(
+            AuditEntry(
+              id: (raw['id'] ?? '').toString(),
+              waktu:
+                  DateTime.tryParse((raw['dibuat_pada'] ?? '').toString()) ??
+                  DateTime.now(),
+              aktor: (raw['id_user'] ?? raw['aktor'] ?? 'Sistem').toString(),
+              aksi: (raw['aksi'] ?? '').toString(),
+              entitas: (raw['entitas'] ?? '').toString(),
+              ip: (raw['alamat_ip'] ?? raw['ip'] ?? '').toString(),
+              before: const {},
+              after: (raw['metadata'] is Map)
+                  ? (raw['metadata'] as Map).map(
+                      (k, v) => MapEntry(k.toString(), v.toString()),
+                    )
+                  : const {},
+              hashPrev: '',
+              hash: '',
+            ),
+          );
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _all = parsed;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = e.toString();
+      });
+    }
   }
 
   @override
@@ -39,7 +101,7 @@ class _AuditPageState extends State<AuditPage> {
     super.dispose();
   }
 
-  List<AuditEntry> get _filtered => filterAudit(
+  List<AuditEntry> get _filtered => AdminRules.filterLog(
     _all,
     query: _search.text,
     aksi: _kategori,
@@ -47,7 +109,7 @@ class _AuditPageState extends State<AuditPage> {
   );
 
   Future<void> _inspect(AuditEntry e) async {
-    final rows = diffStates(e.before, e.after);
+    final rows = AdminRules.diffLog(e.before, e.after);
     await showAdminForm<void>(
       context: context,
       title: 'Inspeksi ${e.aksi}',
@@ -58,9 +120,8 @@ class _AuditPageState extends State<AuditPage> {
           Text('${e.aktor} • ${e.ip}'),
           Text(
             '${e.waktu.day}/${e.waktu.month} ${e.waktu.hour}:${e.waktu.minute.toString().padLeft(2, '0')} • ${e.entitas}',
-            style: const TextStyle(
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
           ),
           const SizedBox(height: 12),
           if (rows.isEmpty)
@@ -71,9 +132,8 @@ class _AuditPageState extends State<AuditPage> {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: r.changed
-                    ? Theme.of(
-                        context,
-                      ).colorScheme.errorContainer.withValues(alpha: 0.3)
+                    ? Theme.of(context).colorScheme.errorContainer
+                          .withValues(alpha: 0.3)
                     : Theme.of(context).colorScheme.surfaceContainerHighest
                           .withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(8),
@@ -91,14 +151,14 @@ class _AuditPageState extends State<AuditPage> {
                     flex: 3,
                     child: Text(
                       r.before,
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: r.changed
                             ? Theme.of(context).colorScheme.error
                             : null,
                         decoration: r.changed
                             ? TextDecoration.lineThrough
                             : null,
-                        fontSize: 12,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ),
@@ -107,14 +167,14 @@ class _AuditPageState extends State<AuditPage> {
                     flex: 3,
                     child: Text(
                       r.after,
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: r.changed
                             ? Theme.of(context).colorScheme.primary
                             : null,
                         fontWeight: r.changed
                             ? FontWeight.bold
                             : FontWeight.normal,
-                        fontSize: 12,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ),
@@ -131,18 +191,62 @@ class _AuditPageState extends State<AuditPage> {
     );
   }
 
+  void _exportCsv() {
+    final rows = _filtered;
+    final header = AdminRules.csvRow([
+      'waktu',
+      'aksi',
+      'aktor',
+      'entitas',
+      'ip',
+    ]);
+    final body = rows
+        .map(
+          (e) => AdminRules.csvRow([
+            e.waktu.toIso8601String(),
+            e.aksi,
+            e.aktor,
+            e.entitas,
+            e.ip,
+          ]),
+        )
+        .join('\n');
+    final csv = '$header\n$body';
+    showAdminForm<void>(
+      context: context,
+      title: 'Ekspor CSV Audit (${rows.length} baris)',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SelectableText(
+            csv,
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.tonalIcon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.check, size: 18),
+              label: const Text('Tutup'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final filtered = _filtered;
     final pages = (filtered.length / _perPage).ceil().clamp(1, 999);
     _page = _page.clamp(0, pages - 1);
-    final rows = filtered
-        .skip(_page * _perPage)
-        .take(_perPage)
-        .toList();
-    final valid = verifyChain(_all);
-    final anomalies = _all.where(isAnomaly).length;
+    final rows = filtered.skip(_page * _perPage).take(_perPage).toList();
+    final valid = AdminRules.verifyChain(_all);
+    final anomalies = _all.where(AdminRules.isAnomaly).length;
 
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(
@@ -162,7 +266,7 @@ class _AuditPageState extends State<AuditPage> {
                   subtitle:
                       '${_all.length} rekaman • $anomalies anomali • append-only WORM',
                   action: FilledButton.tonalIcon(
-                    onPressed: () => soon(context, 'Ekspor CSV audit'),
+                    onPressed: _exportCsv,
                     icon: const Icon(Icons.download_outlined, size: 18),
                     label: const Text('Ekspor CSV'),
                   ),
@@ -194,8 +298,7 @@ class _AuditPageState extends State<AuditPage> {
                   child: FilterBar(
                     searchController: _search,
                     searchHint: 'Cari ID / aktor / aksi…',
-                    onSearchChanged: (_) =>
-                        setState(() => _page = 0),
+                    onSearchChanged: (_) => setState(() => _page = 0),
                     onRefresh: () => setState(() {}),
                     filters: [
                       FilterOption(
@@ -251,9 +354,8 @@ class _AuditPageState extends State<AuditPage> {
                     child: Reveal(
                       delayMs: (i * 30).clamp(0, 240),
                       child: BezelCard(
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: isAnomaly(rows[i])
+                        child: AdminListRow(
+                          leading: AdminRules.isAnomaly(rows[i])
                               ? const Icon(Icons.warning_amber_outlined)
                               : const Icon(Icons.history_outlined),
                           title: Text(
@@ -268,7 +370,7 @@ class _AuditPageState extends State<AuditPage> {
                             spacing: 4,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              if (isAnomaly(rows[i]))
+                              if (AdminRules.isAnomaly(rows[i]))
                                 const StatusBadge(
                                   label: 'ANOMALI',
                                   tone: BadgeTone.danger,
@@ -284,23 +386,15 @@ class _AuditPageState extends State<AuditPage> {
                     ),
                   ),
               if (pages > 1)
-                Row(
-                  children: [
-                    Text('Hal ${_page + 1}/$pages'),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: _page > 0
-                          ? () => setState(() => _page--)
-                          : null,
-                      icon: const Icon(Icons.chevron_left),
-                    ),
-                    IconButton(
-                      onPressed: _page < pages - 1
-                          ? () => setState(() => _page++)
-                          : null,
-                      icon: const Icon(Icons.chevron_right),
-                    ),
-                  ],
+                AdminPagination(
+                  page: _page,
+                  pages: pages,
+                  total: filtered.length,
+                  unit: 'log',
+                  onPrev: _page > 0 ? () => setState(() => _page--) : null,
+                  onNext: _page < pages - 1
+                      ? () => setState(() => _page++)
+                      : null,
                 ),
               const SizedBox(height: 80),
             ],

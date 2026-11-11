@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../core/admin_api_scope.dart';
 import '../models/civitas.dart';
-import '../models/civitas_seed.dart';
 import '../models/master_data.dart';
-import '../models/master_seed.dart';
+import '../rules/admin_rules.dart';
 import '../widgets/admin_dialog.dart';
+import '../widgets/admin_page.dart';
 import '../widgets/bezel_card.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/filter_bar.dart';
@@ -22,18 +23,18 @@ class CivitasPage extends StatefulWidget {
 
 class _CivitasPageState extends State<CivitasPage> {
   final _search = TextEditingController();
-  late List<Mahasiswa> _mhs;
-  late List<Dosen> _dsn;
-  late List<Prodi> _prodi;
+  List<Mahasiswa> _mhs = const [];
+  List<Dosen> _dsn = const [];
+  List<Prodi> _prodi = const [];
   String _angkatan = 'SEMUA';
   String _status = 'SEMUA';
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _mhs = seedMahasiswa();
-    _dsn = seedDosenCivitas();
-    _prodi = seedProdi();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   @override
@@ -42,47 +43,105 @@ class _CivitasPageState extends State<CivitasPage> {
     super.dispose();
   }
 
-  String _prodiNama(String id) => _prodi
-      .where((p) => p.id == id)
-      .map((p) => p.nama)
-      .join()
-      .ifEmpty('—');
+  String _prodiNama(String id) =>
+      _prodi.where((p) => p.id == id).map((p) => p.nama).join().ifEmpty('—');
 
   void _snack(String m, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(m),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-      ),
-    );
+    if (!mounted) return;
+    showAdminSnack(context, m, error: error);
   }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final client = AdminApiScope.clientOf(context);
+      if (client == null) throw Exception('Sesi API tidak tersedia.');
+      final master = await client.getJson('/api/v1/master');
+      final prodi = <Prodi>[];
+      if (master is Map && master['program_studi'] is List) {
+        for (final r in (master['program_studi'] as List).whereType<Map>()) {
+          prodi.add(Prodi(
+            id: (r['id'] ?? '').toString(),
+            kode: (r['kode'] ?? '').toString(),
+            nama: (r['nama'] ?? '').toString(),
+            jenjang: (r['jenjang'] ?? '').toString(),
+          ));
+        }
+      }
+      final mhsPage = await client.getJson('/api/v1/civitas/mahasiswa?limit=200');
+      final dsnPage = await client.getJson('/api/v1/civitas/dosen?limit=200');
+      List<T> items<T>(dynamic page, T Function(Map<String, dynamic>) f) {
+        if (page is! Map || page['items'] is! List) return <T>[];
+        return (page['items'] as List)
+            .whereType<Map>()
+            .map((e) => f(e.cast<String, dynamic>()))
+            .toList();
+      }
+      final mhs = items(mhsPage, (r) => Mahasiswa(
+            npm: (r['npm'] ?? '').toString(),
+            nama: (r['nama_lengkap'] ?? r['nama'] ?? '').toString(),
+            prodiId: (r['id_program_studi'] ?? '').toString(),
+            angkatan: (r['tahun_masuk'] is num) ? (r['tahun_masuk'] as num).toInt() : 0,
+            status: (r['status'] ?? 'AKTIF').toString(),
+            sks: 0,
+            ipk: 0,
+            dosenWali: r['id_dosen_wali']?.toString(),
+          ));
+      final dsn = items(dsnPage, (r) => Dosen(
+            nidn: (r['nidn'] ?? '').toString(),
+            nama: (r['nama_lengkap'] ?? r['nama'] ?? '').toString(),
+            prodiId: (r['id_program_studi'] ?? '').toString(),
+            status: (r['status'] ?? 'AKTIF').toString(),
+            bebanSks: 0,
+          ));
+      if (!mounted) return;
+      setState(() {
+        _prodi = prodi;
+        _mhs = mhs;
+        _dsn = dsn;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
 
   Future<void> _registerForm() async {
     final res = await showAdminForm<_RegisterResult>(
       context: context,
       title: 'Registrasi Mahasiswa Baru',
-      child: _RegisterForm(
-        prodi: _prodi,
-        existingNpms: _mhs.map((m) => m.npm).toList(),
-      ),
+      child: _RegisterForm(prodi: _prodi),
     );
     if (res == null) return;
-    if (res.nama.isEmpty) {
-      _snack('Nama wajib.', error: true);
+    final client = AdminApiScope.clientOf(context);
+    if (client == null) {
+      _snack('Sesi API tidak tersedia.', error: true);
       return;
     }
-    setState(() {
-      _mhs.add(
-        Mahasiswa(
-          npm: res.npm,
-          nama: res.nama,
-          prodiId: res.prodiId,
-          angkatan: res.tahun,
-        ),
-      );
-    });
-    _snack('Mahasiswa ${res.npm} terdaftar + akun dibuat.');
+    try {
+      await client.postJson('/api/v1/civitas/mahasiswa', {
+        'email': res.email,
+        'nama_lengkap': res.nama,
+        'id_program_studi': res.prodiId,
+        'tahun_masuk': res.tahun,
+        'jenis_kelamin': res.jenisKelamin,
+      });
+      if (!mounted) return;
+      _snack('Mahasiswa terdaftar.');
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      _snack(e.toString(), error: true);
+    }
   }
 
   Future<void> _mutateStatus(Mahasiswa m) async {
@@ -97,16 +156,45 @@ class _CivitasPageState extends State<CivitasPage> {
       child: _MutateForm(current: m.status, targets: targets),
     );
     if (to == null) return;
-    if (!canTransition(m.status, to)) {
-      _snack('Transisi ilegal.', error: true);
+    final tr = AdminRules.studentTransition(m.status, to);
+    if (!tr.ok) {
+      _snack(tr.message ?? 'Transisi ilegal.', error: true);
       return;
     }
-    setState(() => m.status = to);
-    _snack('${m.npm} → $to. Audit tercatat.');
+    final client = AdminApiScope.clientOf(context);
+    if (client == null) {
+      _snack('Sesi API tidak tersedia.', error: true);
+      return;
+    }
+    try {
+      await client.patchJson('/api/v1/civitas/mahasiswa/${m.npm}', {'status': to});
+      if (!mounted) return;
+      _snack('${m.npm} → $to.');
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      _snack(e.toString(), error: true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              const SizedBox(height: 8),
+              FilledButton.tonal(onPressed: _load, child: const Text('Muat ulang')),
+            ],
+          ),
+        ),
+      );
+    }
     final width = MediaQuery.sizeOf(context).width;
     final q = _search.text.toLowerCase();
     final list = _mhs.where((m) {
@@ -124,7 +212,10 @@ class _CivitasPageState extends State<CivitasPage> {
 
     return DefaultTabController(
       length: 2,
-      child: SingleChildScrollView(
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.symmetric(
           horizontal: width >= 1024 ? 24 : 16,
           vertical: 16,
@@ -149,7 +240,12 @@ class _CivitasPageState extends State<CivitasPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const TabBar(tabs: [Tab(text: 'Mahasiswa'), Tab(text: 'Dosen')]),
+                const TabBar(
+                  tabs: [
+                    Tab(text: 'Mahasiswa'),
+                    Tab(text: 'Dosen'),
+                  ],
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   height: 620,
@@ -211,15 +307,17 @@ class _CivitasPageState extends State<CivitasPage> {
                                     itemBuilder: (_, i) {
                                       final m = list[i];
                                       return BezelCard(
-                                        child: ListTile(
-                                          contentPadding: EdgeInsets.zero,
+                                        child: AdminListRow(
                                           title: Text(
                                             '${m.npm} • ${m.nama}',
-                                            style: const TextStyle(
-                                              fontFeatures: [
-                                                FontFeature.tabularFigures(),
-                                              ],
-                                            ),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                  fontFeatures: const [
+                                                    FontFeature.tabularFigures(),
+                                                  ],
+                                                ),
                                           ),
                                           subtitle: Text(
                                             '${_prodiNama(m.prodiId)} • ${m.angkatan} • ${m.sks} SKS • IPK ${m.ipk}',
@@ -246,22 +344,18 @@ class _CivitasPageState extends State<CivitasPage> {
                       ),
                       ListView.separated(
                         itemCount: _dsn.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(height: 8),
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (_, i) {
                           final d = _dsn[i];
-                          final warn = bkdWarning(d.bebanSks);
+                          final warn = AdminRules.bkd(d.bebanSks).asError;
                           return BezelCard(
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
+                            child: AdminListRow(
                               title: Text('${d.nidn} • ${d.nama}'),
                               subtitle: Text(
                                 '${_prodiNama(d.prodiId)} • ${d.bebanSks} SKS${warn != null ? ' • $warn' : ' • BKD ideal'}',
                               ),
                               trailing: StatusBadge(
-                                label: warn == null
-                                    ? d.status
-                                    : 'BKD WARNING',
+                                label: warn == null ? d.status : 'BKD WARNING',
                                 tone: warn == null
                                     ? BadgeTone.success
                                     : BadgeTone.pending,
@@ -277,6 +371,7 @@ class _CivitasPageState extends State<CivitasPage> {
               ],
             ),
           ),
+          ),
         ),
       ),
     );
@@ -287,14 +382,20 @@ class _RegisterResult {
   final String prodiId;
   final int tahun;
   final String nama;
-  final String npm;
-  const _RegisterResult(this.prodiId, this.tahun, this.nama, this.npm);
+  final String email;
+  final String jenisKelamin;
+  const _RegisterResult({
+    required this.prodiId,
+    required this.tahun,
+    required this.nama,
+    required this.email,
+    required this.jenisKelamin,
+  });
 }
 
 class _RegisterForm extends StatefulWidget {
   final List<Prodi> prodi;
-  final List<String> existingNpms;
-  const _RegisterForm({required this.prodi, required this.existingNpms});
+  const _RegisterForm({required this.prodi});
 
   @override
   State<_RegisterForm> createState() => _RegisterFormState();
@@ -302,40 +403,29 @@ class _RegisterForm extends StatefulWidget {
 
 class _RegisterFormState extends State<_RegisterForm> {
   late String _prodiId;
-  int _tahun = 2026;
+  int _tahun = DateTime.now().year;
+  String _jk = 'L';
   final _nama = TextEditingController();
+  final _email = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _prodiId = widget.prodi.first.id;
+    _prodiId = widget.prodi.isNotEmpty ? widget.prodi.first.id : '';
   }
 
   @override
   void dispose() {
     _nama.dispose();
+    _email.dispose();
     super.dispose();
-  }
-
-  String? get _preview {
-    try {
-      final prodi = widget.prodi.firstWhere((p) => p.id == _prodiId);
-      final prefix =
-          '${(_tahun % 100).toString().padLeft(2, '0')}$facultyCodeTI${prodi.kode}';
-      return generateNpm(
-        year: _tahun,
-        facultyCode: facultyCodeTI,
-        prodiCode: prodi.kode,
-        nextSequence: nextSequenceFor(prefix, widget.existingNpms),
-      );
-    } catch (_) {
-      return null;
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final preview = _preview;
+    final ok = widget.prodi.isNotEmpty &&
+        _nama.text.trim().isNotEmpty &&
+        _email.text.trim().contains('@');
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,10 +435,7 @@ class _RegisterFormState extends State<_RegisterForm> {
           label: const Text('Program Studi'),
           dropdownMenuEntries: [
             for (final p in widget.prodi)
-              DropdownMenuEntry(
-                value: p.id,
-                label: '${p.nama} (${p.kode})',
-              ),
+              DropdownMenuEntry(value: p.id, label: '${p.nama} (${p.kode})'),
           ],
           onSelected: (v) => setState(() => _prodiId = v ?? _prodiId),
         ),
@@ -356,29 +443,21 @@ class _RegisterFormState extends State<_RegisterForm> {
         DropdownMenu<int>(
           initialSelection: _tahun,
           label: const Text('Angkatan'),
-          dropdownMenuEntries: const [
-            DropdownMenuEntry(value: 2026, label: '2026'),
-            DropdownMenuEntry(value: 2025, label: '2025'),
-            DropdownMenuEntry(value: 2024, label: '2024'),
+          dropdownMenuEntries: [
+            for (final y in [DateTime.now().year, DateTime.now().year - 1, DateTime.now().year - 2, DateTime.now().year - 3])
+              DropdownMenuEntry(value: y, label: '$y'),
           ],
           onSelected: (v) => setState(() => _tahun = v ?? _tahun),
         ),
-        const SizedBox(height: 12),
-        BezelCard(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  preview ?? 'Kuota urut penuh (999)',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-              const StatusBadge(label: 'NPM AUTO', tone: BadgeTone.info),
-            ],
-          ),
+        const SizedBox(height: 8),
+        DropdownMenu<String>(
+          initialSelection: _jk,
+          label: const Text('Jenis kelamin'),
+          dropdownMenuEntries: const [
+            DropdownMenuEntry(value: 'L', label: 'Laki-laki'),
+            DropdownMenuEntry(value: 'P', label: 'Perempuan'),
+          ],
+          onSelected: (v) => setState(() => _jk = v ?? _jk),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -387,11 +466,22 @@ class _RegisterFormState extends State<_RegisterForm> {
             labelText: 'Nama lengkap *',
             border: OutlineInputBorder(),
           ),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Akun login dibuat otomatis. Password awal: NPM#TglLahir.',
-          style: TextStyle(fontSize: 12),
+        TextField(
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+            labelText: 'Email *',
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'NPM, akun login, dan audit dibuat oleh backend.',
+          style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 16),
         Row(
@@ -403,17 +493,18 @@ class _RegisterFormState extends State<_RegisterForm> {
             ),
             const SizedBox(width: 8),
             FilledButton(
-              onPressed: preview == null
-                  ? null
-                  : () => Navigator.pop(
+              onPressed: ok
+                  ? () => Navigator.pop(
                       context,
                       _RegisterResult(
-                        _prodiId,
-                        _tahun,
-                        _nama.text.trim(),
-                        preview,
+                        prodiId: _prodiId,
+                        tahun: _tahun,
+                        nama: _nama.text.trim(),
+                        email: _email.text.trim().toLowerCase(),
+                        jenisKelamin: _jk,
                       ),
-                    ),
+                    )
+                  : null,
               child: const Text('Daftarkan'),
             ),
           ],
@@ -458,11 +549,11 @@ class _MutateFormState extends State<_MutateForm> {
           onSelected: (v) => setState(() => _to = v ?? _to),
         ),
         if (!krsUnlocked(_to))
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
             child: Text(
               'Portal KRS terkunci pada status ini.',
-              style: TextStyle(fontSize: 12),
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
         const SizedBox(height: 16),

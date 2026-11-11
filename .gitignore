@@ -46,3 +46,14 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Backend generated artifacts
+backend/**/build/
+backend/**/.dart_frog/
+
+# Local environment / secrets (jangan pernah commit)
+.env
+.env.*
+!.env.example
+!**/.env.example
+backend/web_server/.env

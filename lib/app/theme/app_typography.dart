@@ -37,6 +37,11 @@ abstract class AppTypography {
             fontWeight: FontWeight.w600,
             height: 24 / 16,
           ),
+          titleSmall: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            height: 20 / 14,
+          ),
           bodyLarge: GoogleFonts.plusJakartaSans(
             fontSize: 16,
             fontWeight: FontWeight.w400,
@@ -46,6 +51,11 @@ abstract class AppTypography {
             fontSize: 14,
             fontWeight: FontWeight.w400,
             height: 20 / 14,
+          ),
+          bodySmall: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+            height: 16 / 12,
           ),
           labelLarge: GoogleFonts.plusJakartaSans(
             fontSize: 14,
